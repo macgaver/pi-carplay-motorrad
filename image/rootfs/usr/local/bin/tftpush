@@ -1,0 +1,2 @@
+#!/bin/sh
+PYTHONPATH=/opt/tftpush${PYTHONPATH:+:$PYTHONPATH} exec python3 -m tftpush "$@"

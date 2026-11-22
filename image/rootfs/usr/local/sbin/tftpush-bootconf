@@ -1,0 +1,95 @@
+#!/bin/bash
+# Runs at every boot. Applies the settings in bmw-carplay.txt on the boot partition, so the
+# Pi can be set up from any computer by editing one text file on the SD card:
+#   WIFI_COUNTRY, WIFI_SSID / WIFI_PASSWORD, WIFI2_SSID / WIFI2_PASSWORD
+CONF=${CONF:-/boot/firmware/bmw-carplay.txt}
+CMDLINE=${CMDLINE:-/boot/firmware/cmdline.txt}
+NM_DIR=${NM_DIR:-/etc/NetworkManager/system-connections}
+SYS_NET=${SYS_NET:-/sys/class/net}
+DRY=${DRY:-}
+
+say() { echo "tftpush-bootconf: $*"; }
+run() { if [ -n "$DRY" ]; then echo "+ $*"; else "$@"; fi; }
+
+get() {  # last KEY=VALUE wins; spaces, quotes, CRLF and a BOM are tolerated
+    [ -f "$CONF" ] || return 0
+    tr -d '\r' < "$CONF" | sed '1s/^\xEF\xBB\xBF//' \
+        | sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//Ip" | tail -n 1 \
+        | sed -e 's/[[:space:]]*$//' -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/"
+}
+
+[ -f "$CONF" ] || say "no $CONF; nothing to apply"
+
+# --- radio on, regulatory domain ------------------------------------------------
+run rfkill unblock all
+country=$(get WIFI_COUNTRY | tr '[:lower:]' '[:upper:]')
+if [[ "$country" =~ ^[A-Z]{2}$ ]]; then
+    run iw reg set "$country"
+    if [ -f "$CMDLINE" ] && ! grep -q "cfg80211.ieee80211_regdom=$country\b" "$CMDLINE"; then
+        new=$(sed -e 's/ *cfg80211\.ieee80211_regdom=[A-Za-z]*//g' -e "1s/\$/ cfg80211.ieee80211_regdom=$country/" "$CMDLINE")
+        if [ -n "$DRY" ]; then echo "+ cmdline: $new"; else printf '%s\n' "$new" > "$CMDLINE" && sync; fi
+        say "regulatory domain $country saved to cmdline.txt"
+    fi
+elif [ -n "$country" ]; then
+    say "WIFI_COUNTRY '$country' is not a two-letter code; ignored"
+fi
+
+# --- home / hotspot Wi-Fi, always on the onboard radio ----------------------------
+onboard=
+for _ in $(seq 1 15); do
+    for dev in "$SYS_NET"/*; do
+        [ -e "$dev/wireless" ] || [ -e "$dev/phy80211" ] || continue
+        case "$(basename "$dev")" in p2p-*) continue ;; esac
+        [ "$(basename "$(readlink -f "$dev/device/subsystem" 2>/dev/null)")" = usb ] && continue
+        onboard=$(basename "$dev"); break
+    done
+    [ -n "$onboard" ] || [ -n "$DRY" ] && break
+    sleep 1
+done
+[ -n "$onboard" ] || say "no onboard Wi-Fi found; profiles are not tied to an interface"
+
+changed=
+mkdir -p "$NM_DIR"
+for n in "" 2; do
+    ssid=$(get "WIFI${n}_SSID"); psk=$(get "WIFI${n}_PASSWORD")
+    file="$NM_DIR/bmw-carplay-wifi${n}.nmconnection"
+    if [ -z "$ssid" ]; then
+        [ -f "$file" ] && { run rm -f "$file"; changed=1; say "Wi-Fi profile ${n:-1} removed"; }
+        continue
+    fi
+    body="[connection]
+id=bmw-carplay-wifi${n}
+type=wifi
+autoconnect=true
+autoconnect-priority=$([ -z "$n" ] && echo 20 || echo 10)
+${onboard:+interface-name=$onboard
+}
+[wifi]
+mode=infrastructure
+ssid=$ssid
+"
+    if [ -n "$psk" ]; then
+        body+="
+[wifi-security]
+key-mgmt=wpa-psk
+psk=$psk
+"
+    fi
+    body+="
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto
+"
+    if [ "$(cat "$file" 2>/dev/null)" != "$body" ]; then
+        if [ -n "$DRY" ]; then echo "+ write $file"; echo "$body"; else
+            ( umask 077; printf '%s\n' "$body" > "$file" ); chmod 600 "$file"
+        fi
+        changed=1
+        say "Wi-Fi profile ${n:-1} set to '$ssid'"
+    fi
+done
+if [ -n "$changed" ]; then run nmcli connection reload; fi
+run nmcli radio wifi on
+exit 0

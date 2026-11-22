@@ -1,0 +1,20 @@
+[Unit]
+Description=tftpush: headless link to the BMW Motorrad TFT
+Documentation=https://github.com/macgaver/bmw-carplay
+# Start as soon as Bluetooth is up: NetworkManager and tftpush-bootconf come up in parallel
+# (~3 s later on a Pi 4); wifi.prepare() waits for NetworkManager before it takes the Wi-Fi
+# interface, which happens only after the bike has handed over its Wi-Fi Direct credentials.
+After=bluetooth.service
+Wants=bluetooth.service tftpush-bootconf.service
+RequiresMountsFor=/boot/firmware /var/lib/tftpush
+
+[Service]
+ExecStart=/usr/local/bin/tftpush auto
+WorkingDirectory=/var/lib/tftpush
+StateDirectory=tftpush
+Environment=PYTHONUNBUFFERED=1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

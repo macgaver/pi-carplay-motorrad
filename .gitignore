@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+captures/
+frames/
+*.egg-info/
+.pytest_cache/
+
+image/build/
+image/config.env

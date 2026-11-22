@@ -1,0 +1,13 @@
+#!/bin/bash
+# One screen of "what is the Pi doing" for an SSH session.
+[ "$(id -u)" = 0 ] || exec sudo "$0" "$@"
+echo "== image";      cat /opt/tftpush/BUILD 2>/dev/null
+echo "== service";    systemctl is-active tftpush tftpush-bootconf bluetooth NetworkManager | paste -sd' '
+echo "== TFT";        cat /var/lib/tftpush/tft-address 2>/dev/null || echo "not paired yet"
+echo "== bluetooth";  hciconfig hci0 2>/dev/null | sed -n '1,3p'; hciconfig hci0 class 2>/dev/null | sed -n '2p'
+bluetoothctl devices Paired 2>/dev/null
+echo "== audio (media profiles)"; systemctl --user -M tftaudio@ is-active pipewire wireplumber 2>/dev/null | paste -sd' '
+echo "== network";    nmcli -t -f DEVICE,TYPE,STATE,CONNECTION device 2>/dev/null
+iw dev 2>/dev/null | awk '/Interface|type/{printf "%s ", $0} END{print ""}'
+echo "== last capture"; ls -t /var/lib/tftpush/captures/*.log 2>/dev/null | head -1
+echo "== log (journalctl -u tftpush -f for live)"; journalctl -u tftpush -n "${1:-25}" --no-pager

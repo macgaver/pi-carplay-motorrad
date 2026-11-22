@@ -1,0 +1,14 @@
+[Unit]
+Description=Apply bmw-carplay.txt from the boot partition (Wi-Fi, country)
+After=NetworkManager.service systemd-rfkill.service
+Wants=NetworkManager.service
+RequiresMountsFor=/boot/firmware
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/tftpush-bootconf
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target

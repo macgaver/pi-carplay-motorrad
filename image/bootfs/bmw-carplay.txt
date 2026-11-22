@@ -1,0 +1,44 @@
+# bmw-carplay settings. Edit this file on the SD card from any computer (it is on the
+# small "bootfs" partition that Windows, macOS and Linux can all open), then boot the Pi.
+# It is read at every boot. Lines starting with # are ignored.
+
+# --- Home Wi-Fi (optional: only for SSH and updates; the bike link does not need it) ---
+# Two-letter country code; the Wi-Fi radio stays off without one.
+WIFI_COUNTRY=@WIFI_COUNTRY@
+WIFI_SSID=@WIFI_SSID@
+WIFI_PASSWORD=@WIFI_PASSWORD@
+# A second network, for example your phone's hotspot for SSH at the bike.
+WIFI2_SSID=
+WIFI2_PASSWORD=
+
+# --- Bluetooth ---
+# The name the bike shows in Settings > Connections > Mobile device.
+BT_NAME=Pi CarPlay
+# auto:   visible for pairing whenever no TFT session is up (default)
+# always: always visible, and any device may pair
+# off:    never visible (after pairing, for the cautious)
+PAIRING=auto
+# Once the bike is paired, only that bike may pair again (it always can, even after it
+# forgot the Pi). Any other device may pair only during this many seconds after power-up,
+# until the bike connects: for a new TFT, switch the ignition off and on and pair it then.
+PAIRING_WINDOW=180
+# Leave empty: the address is learnt when the bike pairs. Set it to force one TFT.
+TFT_ADDR=
+
+# --- Wi-Fi Direct to the TFT ---
+# auto: a USB Wi-Fi adapter if plugged in, otherwise the onboard radio (which then
+#       leaves the home Wi-Fi while the TFT link is up). Or a name: wlan0, wlan1.
+P2P_IFACE=auto
+
+# --- Picture ---
+# A PNG/JPEG copied next to this file, e.g. IMAGE=my.png. Empty: the test card.
+IMAGE=
+
+# --- CarPlay ---
+# Size of CarPlay in the small square nav box:
+#   small:  the whole wide picture, shrunk into the box
+#   normal: a square cut from the picture (default)        large: a tighter cut, bigger
+# The big nav screen always shows CarPlay 1:1 (CarPlay sizes itself to the screen height).
+ZOOM=normal
+# Where the square cut is taken from the wide picture: center (default), left or right.
+SMALL_NAV_VIEW=center

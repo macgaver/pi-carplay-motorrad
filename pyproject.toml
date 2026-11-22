@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tftpush"
+version = "0.1.0"
+description = "Raspberry Pi prototype: CarPlay (via a Carlinkit USB dongle) or an image on a BMW Motorrad TFT over Bluetooth + Wi-Fi Direct + mySPIN"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = ["Pillow>=9", "dbus-next>=0.2.3"]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+carplay = ["pyusb>=1.2", "av>=12"]
+
+[project.scripts]
+tftpush = "tftpush.cli:main"
+
+[tool.setuptools]
+packages = ["tftpush", "tftpush.carlinkit"]
+
+[tool.setuptools.package-data]
+"tftpush.carlinkit" = ["testclip.h264"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
