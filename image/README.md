@@ -63,6 +63,80 @@ Measured on the Pi 4 (2026-11-19), reboot to tftpush ready: 54.6 s before, 19.7 
 Wi-Fi Direct uses a USB Wi-Fi adapter if one is plugged in. Without one it borrows the
 onboard radio, so the home Wi-Fi (and SSH over it) drops while the TFT link is up.
 
+## Releases and self-update
+
+The version lives in one place: the `VERSION` file at the root of the repo (e.g. `0.9.704`).
+The TFT shows it on the status screens (bottom left on the wide screen, top right on the
+square one), and `tftpush-status` prints it.
+
+To publish a version:
+
+```sh
+echo 0.9.705 > VERSION && git commit -am "Version 0.9.705"
+git tag v$(cat VERSION) && git push origin main v$(cat VERSION)
+```
+
+`.github/workflows/release.yml` then runs the tests, builds the image, and attaches to the
+GitHub release of that tag:
+
+| File | What it is |
+| --- | --- |
+| `pi-carplay-motorrad-<version>.img.xz` (+ `.sig`, `.sha256`) | The SD-card image to flash |
+| `auto-update.pkg` (+ `.sig`) | What Pis already out there download to update themselves |
+| `SHA256SUMS` | Checksums of all of the above |
+
+The build stops if the tag doesn't match `VERSION`. A tag can be built again from
+Actions > Release > Run workflow. Pis only take the **latest** release, so tick
+"pre-release" on a release to keep it away from them while you test it.
+
+`auto-update.pkg` is a `.tar.gz` (see `tools/make-update-pkg.sh`): the `tftpush` folder,
+everything in `image/rootfs`, and `image/update-hook.sh`. That hook runs on the Pi after
+the copy; put whatever the next version needs there (a new apt package, a unit to
+enable). It never touches `bmw-carplay.txt`, so the rider's settings stay as they are.
+
+On the Pi, nothing is installed without the rider saying so:
+
+1. At power-up, if the home Wi-Fi (`WIFI_SSID`) is in range, tftpush waits for it to
+   connect (up to ~25 s), looks for a newer release, and downloads it before the BMW link
+   takes the radio. Away from home it goes on after a few seconds at most: as soon as the
+   Wi-Fi scan shows the home network isn't there. With no Wi-Fi set up there is no wait.
+2. Downloaded (signature checked)? The TFT shows **New version ready** with
+   **Update now / Not now**, over CarPlay. UP/DOWN choose, RIGHT confirms, LEFT = not now.
+   No answer in 90 s = not now. "Not now" asks again at the next power-up at home.
+3. **Update now**: the TFT shows "Updating", tftpush stops, the files are installed, and
+   tftpush starts again on the new version (about a minute). If it doesn't stay up, the
+   old files are put back and that version isn't offered again.
+4. The download failed (rode off, Wi-Fi lost)? CarPlay as usual; a stalled download gives
+   up after 20 s.
+
+`tftpush-update.timer` (3 minutes after boot, then every 6 hours) and NetworkManager (a
+connection came up) also download a new release when parked at home with no TFT link, so
+the next power-up can ask straight away. They never install.
+
+```sh
+sudo tftpush-update --check          # is there a newer release?
+sudo tftpush-update --now            # download and install now (SSH)
+sudo tftpush-update --now --force    # same, off the home Wi-Fi or after a rollback
+journalctl -u tftpush-update -u 'tftpush-install-*'   # what it did
+```
+
+The release images have no Wi-Fi, SSH key or password in them. For SSH, edit `user-data`
+on the card's `bootfs` partition before the first boot and add your key under
+`ssh_authorized_keys:`. For your own Wi-Fi and key built in, use `image/build.sh` with a
+`config.env`.
+
+### Signing key (one time)
+
+```sh
+tools/release-keygen.sh      # private key in ~/.config/pi-carplay-motorrad/, public key in image/rootfs
+gh secret set UPDATE_SIGNING_KEY < ~/.config/pi-carplay-motorrad/update-signing.key
+```
+
+Commit `image/rootfs/etc/tftpush/update-signing.pub`. Keep a backup of the private key
+somewhere safe: without it, Pis already out there can't update themselves any more.
+Check a file by hand:
+`openssl dgst -sha256 -verify image/rootfs/etc/tftpush/update-signing.pub -signature auto-update.pkg.sig auto-update.pkg`
+
 ## Looking inside
 
 ```sh

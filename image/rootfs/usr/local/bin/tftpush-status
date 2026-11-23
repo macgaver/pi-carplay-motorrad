@@ -2,6 +2,8 @@
 # One screen of "what is the Pi doing" for an SSH session.
 [ "$(id -u)" = 0 ] || exec sudo "$0" "$@"
 echo "== image";      cat /opt/tftpush/BUILD 2>/dev/null
+echo "== version";    echo "$(cat /opt/tftpush/VERSION 2>/dev/null || echo unknown), next update check: $(systemctl show -p NextElapseUSecRealtime --value tftpush-update.timer 2>/dev/null)"
+journalctl -u tftpush-update -n 2 -o cat --no-pager 2>/dev/null
 echo "== service";    systemctl is-active tftpush tftpush-bootconf bluetooth NetworkManager | paste -sd' '
 echo "== TFT";        cat /var/lib/tftpush/tft-address 2>/dev/null || echo "not paired yet"
 echo "== bluetooth";  hciconfig hci0 2>/dev/null | sed -n '1,3p'; hciconfig hci0 class 2>/dev/null | sed -n '2p'

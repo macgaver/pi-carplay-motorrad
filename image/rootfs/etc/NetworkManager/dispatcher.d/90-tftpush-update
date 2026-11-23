@@ -1,0 +1,6 @@
+#!/bin/sh
+# A connection came up (e.g. back home on the Wi-Fi): download a newer release, if any, so
+# the TFT can offer it at the next power-up without waiting. tftpush-update itself checks
+# that it is the home Wi-Fi or Ethernet and that the TFT link is down. Nothing is installed.
+[ "$2" = up ] || exit 0
+exec systemctl start --no-block tftpush-update.service

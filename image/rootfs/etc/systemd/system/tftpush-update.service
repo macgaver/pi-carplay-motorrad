@@ -1,0 +1,12 @@
+[Unit]
+Description=tftpush: download a newer signed release from GitHub (home Wi-Fi only; the TFT asks before installing)
+Documentation=https://github.com/macgaver/pi-carplay-motorrad
+After=tftpush-bootconf.service NetworkManager.service
+ConditionPathExists=/etc/tftpush/update-signing.pub
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/tftpush-update --download
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=20min

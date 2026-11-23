@@ -149,6 +149,7 @@ class CarPlay:
         self.state_version = 0
         self.info: dict[str, str] = {}  # what the dongle reports: bluetooth name / pin, wifi name
         self._cards: dict[tuple, bytes] = {}
+        self.prompt = None  # update.UpdatePrompt: takes over the picture and the keys while active
 
     async def run(self) -> None:
         log.info("CarPlay: zoom %s, small nav %s; asking the dongle for %dx%d @ %d fps, dpi %d, "
@@ -223,7 +224,20 @@ class CarPlay:
             return CarPlaySource(self, self.settings.width, self.settings.height)
         return CarPlaySource(self, screen.width, screen.height)
 
+    def ask(self, prompt) -> None:
+        """Show `prompt` (an update.UpdatePrompt) over everything until it is answered."""
+        self.prompt = prompt
+        self.state_version += 1
+        self.video._notify()
+
+    @property
+    def prompting(self) -> bool:
+        return self.prompt is not None and self.prompt.active
+
     def on_key(self, key: KeyInput) -> None:
+        if self.prompting:
+            self.prompt.on_key(key)
+            return
         if self.state != "connected":
             log.info("key %s ignored: no phone on the dongle", key.label())
             return
@@ -253,6 +267,8 @@ class CarPlay:
     def screen(self) -> Card:
         """What the TFT shows while there's no CarPlay picture: what's missing and what to do."""
         product = self.settings.product
+        if self.prompting:
+            return self.prompt.card(product)
         if self.state == "absent":
             return Card("CarPlay dongle not found",
                         ("Plug the Carlinkit dongle into a USB port on the Pi",
@@ -294,11 +310,13 @@ class CarPlaySource:
 
     @property
     def version(self) -> object:
-        return (self.cp.state_version, self.cp.video.version if self.cp.live else -1)
+        p = self.cp.prompt
+        return (self.cp.state_version, p.changes if p else 0,
+                self.cp.video.version if self.cp.live and not self.cp.prompting else -1)
 
     def jpeg(self, w: int | None = None, h: int | None = None) -> bytes:
         w, h = w or self.width, h or self.height
-        if self.cp.live:
+        if self.cp.live and not self.cp.prompting:
             data = self.cp.video.jpeg(w, h)
             if data:
                 return data

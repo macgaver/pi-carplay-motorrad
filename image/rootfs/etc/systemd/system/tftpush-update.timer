@@ -1,0 +1,10 @@
+[Unit]
+Description=tftpush: look for (and download) a newer release a few minutes after boot, then every 6 hours
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=6h
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

@@ -32,7 +32,7 @@ BASE_SHA256=483db18a48da399b5b7022ffae9a07bc6d99daab30e593aedac09b69ff422843
 
 # --- settings ------------------------------------------------------------------------
 WIFI_COUNTRY=CA WIFI_SSID= WIFI_PASSWORD= HOSTNAME=bmw-carplay PI_USER=pi PI_PASSWORD=
-SSH_PUBKEY_FILES= TIMEZONE= EXTRA_MB=768
+SSH_PUBKEY_FILES= TIMEZONE= EXTRA_MB=768 PI_LOCKED=
 # shellcheck disable=SC1091
 [ -f "$HERE/config.env" ] && . "$HERE/config.env"
 [ -n "$TIMEZONE" ] || TIMEZONE=$(cat /etc/timezone 2>/dev/null || echo Etc/UTC)
@@ -108,8 +108,10 @@ sudo mkdir -p "$MNT/opt/tftpush" "$MNT/var/lib/tftpush"
 sudo rm -rf "$MNT/opt/tftpush/tftpush"
 sudo cp -r --no-preserve=ownership "$REPO/tftpush" "$MNT/opt/tftpush/tftpush"
 sudo find "$MNT/opt/tftpush" -name __pycache__ -prune -exec rm -rf {} +
-REV=$(git -C "$REPO" describe --always --dirty 2>/dev/null || echo unknown)
-printf 'bmw-carplay image\nbuilt   %s\nsource  %s\nbase    %s\n' "$(date -u +%FT%TZ)" "$REV" "$(basename "$BASE_URL")" \
+VERSION=$(tr -d '[:space:]' < "$REPO/VERSION")
+sudo cp "$REPO/VERSION" "$MNT/opt/tftpush/VERSION"
+REV=$(git -C "$REPO" describe --tags --always --dirty 2>/dev/null || echo unknown)
+printf 'bmw-carplay image %s\nbuilt   %s\nsource  %s\nbase    %s\n' "$VERSION" "$(date -u +%FT%TZ)" "$REV" "$(basename "$BASE_URL")" \
     | sudo tee "$MNT/opt/tftpush/BUILD" >/dev/null
 
 # DNS for apt inside the chroot (resolv.conf may be a symlink into /run)
@@ -138,7 +140,7 @@ sed -e "s|@WIFI_COUNTRY@|$(esc "$WIFI_COUNTRY")|" -e "s|@WIFI_SSID@|$(esc "$WIFI
 KEYS=
 for f in $SSH_PUBKEY_FILES; do [ -f "$f" ] && KEYS+="  - $(head -n1 "$f")"$'\n'; done
 GENERATED=
-if [ -z "$PI_PASSWORD" ] && [ -z "$KEYS" ]; then
+if [ -z "$PI_PASSWORD" ] && [ -z "$KEYS" ] && [ -z "$PI_LOCKED" ]; then
     PI_PASSWORD=$(openssl rand -base64 9); GENERATED=1
 fi
 {

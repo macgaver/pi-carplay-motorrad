@@ -86,6 +86,7 @@ sont relus à chaque démarrage. Les plus utiles :
 | `KEYMAP` | p. ex. `UP=left,DOWN=right` | Touche du guidon vers commande CarPlay |
 | `CARPLAY_NIGHT` | `0`, `1` | Mode sombre de CarPlay |
 | `PHONE_BATTERY`, `PHONE_SIGNAL` | `auto`, `off`, `0`-`100` | Ce qu'affiche la barre d'état de la moto (l'adaptateur ne transmet pas les vraies valeurs de l'iPhone) |
+| `AUTO_UPDATE` | `on` (par défaut), `any`, `off` | Au démarrage sur le Wi-Fi maison (`any` : aussi un partage de connexion), télécharge la nouvelle version et demande sur le TFT : mettre à jour maintenant / plus tard |
 
 La liste complète, avec explications, est dans `tftpush/auto.py` (`DEFAULTS`).
 

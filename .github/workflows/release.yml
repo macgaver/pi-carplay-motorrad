@@ -1,0 +1,119 @@
+# New version: put it in the VERSION file (e.g. 0.9.705), commit, then tag it with a "v":
+#   git tag v$(cat VERSION) && git push origin main v$(cat VERSION)
+# The tag must match the VERSION file (the build stops otherwise).
+# This builds and attaches to the GitHub release of that tag (created if it doesn't exist):
+#   pi-carplay-motorrad-<version>.img.xz (+ .sig, .sha256)   SD-card image to flash
+#   auto-update.pkg (+ .sig)                                  what Pis download to update themselves
+#   SHA256SUMS
+# Pis only pick up the "latest" release: mark a release as pre-release to keep it away from them.
+# Needs the repository secret UPDATE_SIGNING_KEY (see tools/release-keygen.sh).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build again (e.g. v1.0); its release files are replaced
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Check the tag and the signing key
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+(\.[0-9]+)*([-+][0-9A-Za-z.-]+)?$ ]] || { echo "::error::tag '$TAG' is not like v1.2 or v1.2.3"; exit 1; }
+          [ -n "$UPDATE_SIGNING_KEY" ] || { echo "::error::secret UPDATE_SIGNING_KEY is not set (tools/release-keygen.sh)"; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+
+      - name: Tag matches the VERSION file
+        run: |
+          VERSION=$(tr -d '[:space:]' < VERSION)
+          [ "v$VERSION" = "$TAG" ] || { echo "::error::tag $TAG but the VERSION file says $VERSION"; exit 1; }
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Signing key matches the public key in the image
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          umask 077
+          printf '%s\n' "$UPDATE_SIGNING_KEY" > "$RUNNER_TEMP/signing.key"
+          diff <(openssl pkey -in "$RUNNER_TEMP/signing.key" -pubout) image/rootfs/etc/tftpush/update-signing.pub \
+            || { echo "::error::UPDATE_SIGNING_KEY does not match image/rootfs/etc/tftpush/update-signing.pub"; exit 1; }
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Tests
+        run: |
+          pip install -q -e '.[test,carplay]'
+          pytest -q
+
+      - name: Make room on the runner
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Build tools
+        run: |
+          sudo apt-get -q update
+          sudo apt-get -q -y install qemu-user-static fuse2fs mtools fdisk xz-utils curl openssl
+
+      - name: Build the SD-card image
+        run: |
+          # Public image: no Wi-Fi, no SSH key, no password (it would end up in this public
+          # log). SSH can be set up in user-data on the card before the first boot.
+          cat > image/config.env <<EOF
+          WIFI_COUNTRY=CA
+          TIMEZONE=Etc/UTC
+          SSH_PUBKEY_FILES=none
+          PI_LOCKED=1
+          EOF
+          image/build.sh
+
+      - name: Update package
+        run: |
+          mkdir -p dist
+          mv image/build/bmw-carplay-pi5.img.xz "dist/pi-carplay-motorrad-$VERSION.img.xz"
+          tools/make-update-pkg.sh dist
+
+      - name: Sign
+        run: |
+          cd dist
+          ../tools/sign-release.sh "$RUNNER_TEMP/signing.key" "pi-carplay-motorrad-$VERSION.img.xz" auto-update.pkg
+          rm -f "$RUNNER_TEMP/signing.key"
+          sha256sum "pi-carplay-motorrad-$VERSION.img.xz" > "pi-carplay-motorrad-$VERSION.img.xz.sha256"
+          sha256sum -- * | grep -v SHA256SUMS > SHA256SUMS
+          ls -lh
+
+      - name: Publish to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --title "Version $VERSION" --generate-notes
+          fi
+          gh release upload "$TAG" dist/* --clobber
+
+      - name: Remove the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/signing.key"

@@ -464,6 +464,8 @@ class Daemon:
         self._reached: set[str] = set()  # stages reached by the current attempt
         self._bluez_owner: str | None = None  # bluetoothd's bus name when we set it up
         self._bt_bad = 0
+        self._update_check: asyncio.Task | None = None
+        self.update_prompt = None  # update.UpdatePrompt, when a new version is ready
 
     # -- small helpers ----------------------------------------------------------
 
@@ -598,6 +600,46 @@ class Daemon:
         except Exception as exc:  # noqa: BLE001 - a status-bar nicety must never stop the box
             log.warning("bike status bar (battery/signal) not published: %s: %s", type(exc).__name__, exc)
 
+    # -- updates ------------------------------------------------------------------
+
+    async def _check_update(self) -> None:
+        """Power-up: on the home Wi-Fi, download a newer release, then ask on the TFT."""
+        from . import update
+
+        try:
+            if getattr(self, "_wifi_reset", None) is not None:
+                await self._wifi_reset   # the onboard radio must be NetworkManager's again
+            version = await update.check_at_power_up(self.cfg)
+        except Exception as exc:  # noqa: BLE001 - an update must never keep the bike from CarPlay
+            log.warning("update check failed: %s: %s", type(exc).__name__, exc)
+            return
+        if not version:
+            return
+        if self.carplay is None:
+            log.info("update %s is ready, but CARPLAY is off so the TFT can't ask; "
+                     "install it with: sudo tftpush-update --install", version)
+            return
+        prompt = update.UpdatePrompt(version, self._update_answer, notify=self.carplay.video._notify)
+        self.update_prompt = prompt
+        self.carplay.ask(prompt)
+        asyncio.create_task(self._prompt_timeout(prompt))
+
+    def _update_answer(self, now: bool) -> None:
+        from . import update
+
+        if now and not update.start_install() and self.update_prompt:
+            self.update_prompt.failed()   # back to CarPlay; the version stays ready for next time
+
+    async def _prompt_timeout(self, prompt) -> None:
+        from . import update
+
+        while prompt.state == "asking":
+            if prompt.timed_out(update.PROMPT_TIMEOUT):
+                log.info("no answer to the update question in %.0f s: not now", update.PROMPT_TIMEOUT)
+                prompt.answer(False)
+                return
+            await asyncio.sleep(1)
+
     # -- loops --------------------------------------------------------------------
 
     async def _session_loop(self, tft: str) -> None:
@@ -705,6 +747,8 @@ class Daemon:
         # the home Wi-Fi from bmw-carplay.txt down until a session ends. Hand it back now; the
         # session takes it again once the TFT answers. In the background: costs ~1 s.
         self._wifi_reset = asyncio.create_task(self._give_back_onboard_wifi())
+        # Meanwhile, look for an update on the home Wi-Fi (the TFT link waits for it below).
+        self._update_check = asyncio.create_task(self._check_update())
         await self._start_phone_status(*phone_switches)
         configured = normalise_addr(cfg["TFT_ADDR"]) if cfg["TFT_ADDR"] else None
         if cfg["TFT_ADDR"] and not configured:
@@ -722,6 +766,10 @@ class Daemon:
         advertise = asyncio.create_task(bt.advertise())
         await asyncio.sleep(1)
         log.info("Bluetooth name %r; pairing mode %s", cfg["BT_NAME"], cfg["PAIRING"])
+
+        if not self._update_check.done():
+            log.info("TFT link waits for the update check (home Wi-Fi)")
+            await self._update_check
 
         visible: bool | None = None
         tick = 0

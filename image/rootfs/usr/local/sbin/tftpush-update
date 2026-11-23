@@ -1,0 +1,260 @@
+#!/bin/bash
+# Updates from the GitHub releases of this project, in two steps:
+#
+#   tftpush-update [--download]  Download a newer release and keep it ready in
+#                                /var/lib/tftpush/update/ready (signature checked).
+#                                Nothing is installed. tftpush runs this at power-up when the
+#                                home Wi-Fi is there, then asks the rider on the TFT; the timer
+#                                and NetworkManager (a connection came up) run it too.
+#   tftpush-update --install     Install the version that is ready: stop tftpush, give the
+#                                Wi-Fi back to NetworkManager, copy, run the update hook, start
+#                                tftpush. If it doesn't stay up, everything is put back and that
+#                                version is not offered again. Run by tftpush when the rider
+#                                picks "Update now" (in its own unit: it outlives tftpush).
+#   tftpush-update --now         Both, for SSH.
+#   tftpush-update --check       Only say whether a newer release exists.
+#   --force                      Skip the checks below and the "failed before" memory.
+#
+# --download only does something when AUTO_UPDATE in bmw-carplay.txt is not "off", the Pi is
+# on the home Wi-Fi (WIFI_SSID) or Ethernet ("any": any network), and the TFT link is down.
+# auto-update.pkg must carry a valid signature (auto-update.pkg.sig) from the key in
+# /etc/tftpush/update-signing.pub, checked after the download and again before installing.
+#
+# All the work is inside main(): bash reads the whole function before running it, so this
+# file can safely be replaced by the update it installs.
+
+main() {
+    set -euo pipefail
+    REPO=${UPDATE_REPO:-macgaver/pi-carplay-motorrad}
+    CONF=${CONF:-/boot/firmware/bmw-carplay.txt}
+    PUBKEY=${PUBKEY:-/etc/tftpush/update-signing.pub}
+    ROOT=${ROOT:-}            # tests only: install under this folder instead of /
+    APP=${APP:-$ROOT/opt/tftpush}
+    STATE=${STATE:-/var/lib/tftpush/update}
+    RUN_DIR=${RUN_DIR:-/run/tftpush}
+    SYS_NET=${SYS_NET:-/sys/class/net}
+    HEALTH_WAIT=${HEALTH_WAIT:-25}
+    PKG=auto-update.pkg
+    READY=$STATE/ready
+
+    local action=download force=''
+    for a in "$@"; do
+        case "$a" in
+            --download) action=download ;;
+            --install) action=install ;;
+            --now) action=now ;;
+            --check) action=check ;;
+            --force) force=1 ;;
+            *) echo "usage: tftpush-update [--download | --install | --now | --check] [--force]"; return 2 ;;
+        esac
+    done
+    [ "$(id -u)" = 0 ] || exec sudo "$0" "$@"
+
+    mkdir -p "$STATE"
+    exec 9>"$STATE/lock"
+    flock -w 30 9 || { say "another update is running"; return 1; }
+
+    case "$action" in
+        download) download "$force" ;;
+        check) download "$force" check ;;
+        install) install ;;
+        now) download "$force" && install ;;
+    esac
+}
+
+say() { echo "tftpush-update: $*"; }
+
+get() {  # same parser as tftpush-bootconf: last KEY=VALUE wins; CRLF, BOM, quotes tolerated
+    [ -f "$CONF" ] || return 0
+    tr -d '\r' < "$CONF" | sed '1s/^\xEF\xBB\xBF//' \
+        | sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//Ip" | tail -n 1 \
+        | sed -e 's/[[:space:]]*$//' -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/"
+}
+
+network_ok() {  # home Wi-Fi profile (from WIFI_SSID) or Ethernet; "any": any connection
+    local name type state
+    while IFS=: read -r name type state; do
+        [ "$state" = activated ] || continue
+        case "$type" in
+            802-3-ethernet) return 0 ;;
+            802-11-wireless)
+                [ "$name" = bmw-carplay-wifi ] && return 0
+                [ "$1" = any ] && return 0 ;;
+        esac
+    done < <(nmcli -t -f NAME,TYPE,STATE connection show --active 2>/dev/null || true)
+    return 1
+}
+
+tft_link_up() {  # the Wi-Fi Direct group to the TFT is up
+    local d
+    for d in "$SYS_NET"/p2p-*; do [ -e "$d" ] && return 0; done
+    return 1
+}
+
+latest_tag() {  # tag of the latest (non-draft, non-prerelease) release
+    curl -fsSL --max-time 30 -H 'Accept: application/vnd.github+json' \
+        "https://api.github.com/repos/$REPO/releases/latest" \
+        | python3 -c 'import json, re, sys
+t = json.load(sys.stdin)["tag_name"]
+sys.exit(0 if re.fullmatch(r"v?[0-9][0-9A-Za-z.+-]*", t) and print(t) is None else 1)' 2>/dev/null
+}
+
+newer() {  # is $1 a higher version than $2?
+    [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | tail -n 1)" = "$1" ]
+}
+
+current() { cat "$APP/VERSION" 2>/dev/null || echo 0; }
+
+verified() {  # $1 package: signed by our key, and only safe paths inside
+    openssl dgst -sha256 -verify "$PUBKEY" -signature "$1.sig" "$1" >/dev/null 2>&1 || {
+        say "BAD SIGNATURE on $(basename "$1")"; return 1; }
+    if tar -tzf "$1" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+        say "package has unsafe paths"; return 1
+    fi
+}
+
+download() {  # $1 force, $2 "check": only report
+    local force=$1 check=${2:-} mode cur tag latest
+    mode=$(get AUTO_UPDATE | tr '[:upper:]' '[:lower:]'); mode=${mode:-on}
+    [ -f "$PUBKEY" ] || { say "no $PUBKEY: cannot check signatures, no updates"; return 1; }
+    cur=$(current)
+    # A ready version that is not newer than what runs (installed by hand, ...) is stale.
+    if [ -f "$READY/VERSION" ] && ! newer "$(cat "$READY/VERSION")" "$cur"; then rm -rf "$READY"; fi
+    if [ -z "$force" ] && [ -z "$check" ]; then
+        case "$mode" in off|no|0|false) say "AUTO_UPDATE=$mode: no updates"; return 0 ;; esac
+        network_ok "$mode" || { say "not on the home Wi-Fi or Ethernet: not looking"; return 0; }
+        if tft_link_up; then say "TFT link is up: not looking now"; return 0; fi
+    fi
+
+    tag=$(latest_tag) || { say "could not reach GitHub"; return 1; }
+    latest=${tag#v}
+    if ! newer "$latest" "$cur"; then say "up to date ($cur; latest release $latest)"; return 0; fi
+    if [ -n "$check" ]; then say "update available: $cur -> $latest"; return 0; fi
+    if [ "$(cat "$READY/VERSION" 2>/dev/null)" = "$latest" ]; then
+        say "$latest already downloaded"; return 0
+    fi
+    if [ -z "$force" ] && [ "$(cat "$STATE/failed" 2>/dev/null)" = "$latest" ]; then
+        say "$latest failed before and was rolled back; 'tftpush-update --now --force' to retry"
+        return 0
+    fi
+
+    say "downloading $latest"
+    local dl=$STATE/download base="https://github.com/$REPO/releases/download/$tag"
+    rm -rf "$dl"; mkdir -p "$dl"
+    # Wi-Fi lost on the way out of the garage: a stalled transfer gives up after 20 s.
+    local slow=(--speed-limit 1000 --speed-time 20)
+    if ! curl -fsSL --retry 2 "${slow[@]}" --max-time 600 -o "$dl/$PKG" "$base/$PKG" \
+        || ! curl -fsSL --retry 2 "${slow[@]}" --max-time 60 -o "$dl/$PKG.sig" "$base/$PKG.sig"; then
+        say "download of $latest failed"; rm -rf "$dl"; return 1
+    fi
+    verified "$dl/$PKG" || { rm -rf "$dl"; return 1; }
+    local pkgver
+    pkgver=$(tar -xzOf "$dl/$PKG" ./VERSION 2>/dev/null | tr -d '[:space:]' || true)
+    if [ "$pkgver" != "$latest" ]; then
+        say "package says version '$pkgver', release is $latest: not kept"; rm -rf "$dl"; return 1
+    fi
+    echo "$latest" > "$dl/VERSION"
+    rm -rf "$READY"; mv "$dl" "$READY"
+    say "$latest downloaded and ready to install"
+}
+
+release_radio() {  # what tftpush's wifi.release does: our wpa_supplicant off, onboard radio to NM
+    local pf d
+    for pf in "$RUN_DIR"/wpa-*.pid; do
+        [ -e "$pf" ] || continue
+        kill "$(cat "$pf")" 2>/dev/null || true; rm -f "$pf"
+    done
+    for d in "$SYS_NET"/*; do
+        [ -e "$d/wireless" ] || [ -e "$d/phy80211" ] || continue
+        case "$(basename "$d")" in p2p-*) continue ;; esac
+        [ "$(basename "$(readlink -f "$d/device/subsystem" 2>/dev/null)")" = usb ] && continue
+        nmcli device set "$(basename "$d")" managed yes >/dev/null 2>&1 || true
+    done
+}
+
+install() {
+    local cur ver new=$STATE/new bak=$STATE/backup f
+    cur=$(current)
+    ver=$(cat "$READY/VERSION" 2>/dev/null || true)
+    if [ -z "$ver" ] || [ ! -f "$READY/$PKG" ]; then say "nothing downloaded to install"; return 1; fi
+    if ! newer "$ver" "$cur"; then say "$ver is not newer than $cur"; rm -rf "$READY"; return 1; fi
+    verified "$READY/$PKG" || { rm -rf "$READY"; return 1; }
+    rm -rf "$new"; mkdir -p "$new"
+    tar -C "$new" --no-same-owner -xzf "$READY/$PKG"
+    if [ "$(cat "$new/VERSION" 2>/dev/null)" != "$ver" ] || [ ! -d "$new/app/tftpush" ] || [ ! -d "$new/rootfs" ]; then
+        say "package for $ver is incomplete: not installed"; rm -rf "$new" "$READY"; return 1
+    fi
+    say "installing $ver (was $cur)"
+
+    # back up what the package replaces
+    rm -rf "$bak"; mkdir -p "$bak/files"
+    cp -a "$APP/tftpush" "$bak/tftpush"
+    for f in VERSION BUILD; do [ -e "$APP/$f" ] && cp -a "$APP/$f" "$bak/$f"; done
+    : > "$bak/added"
+    while IFS= read -r -d '' f; do
+        f=${f#./}
+        if [ -e "$ROOT/$f" ] || [ -L "$ROOT/$f" ]; then
+            mkdir -p "$bak/files/$(dirname "$f")"; cp -a "$ROOT/$f" "$bak/files/$f"
+        else
+            printf '%s\n' "$f" >> "$bak/added"
+        fi
+    done < <(cd "$new/rootfs" && find . \( -type f -o -type l \) -print0)
+
+    # tftpush off (the TFT link goes with it), so the hook can use the home Wi-Fi
+    systemctl stop tftpush.service || true
+    release_radio
+    if ! install_new "$new" "$cur" "$ver"; then
+        say "install of $ver failed: rolling back"; rollback "$ver"; return 1
+    fi
+    systemctl start tftpush.service || true
+    local restarts
+    restarts=$(systemctl show -p NRestarts --value tftpush.service 2>/dev/null || echo 0)
+    sleep "$HEALTH_WAIT"
+    if systemctl is-active --quiet tftpush.service \
+        && [ "$(systemctl show -p NRestarts --value tftpush.service 2>/dev/null || echo 0)" = "$restarts" ]; then
+        rm -rf "$new" "$READY" "$STATE/failed"
+        say "updated to $ver"
+        return 0
+    fi
+    say "tftpush did not stay up on $ver: rolling back"
+    journalctl -u tftpush -n 20 --no-pager || true
+    rollback "$ver"
+    return 1
+}
+
+install_new() {  # $1 unpacked package, $2 old version, $3 new version
+    local new=$1
+    rm -rf "$APP/tftpush.new" "$APP/tftpush.old"
+    cp -r --no-preserve=ownership "$new/app/tftpush" "$APP/tftpush.new"
+    mv "$APP/tftpush" "$APP/tftpush.old"
+    mv "$APP/tftpush.new" "$APP/tftpush"
+    python3 -m compileall -q "$APP/tftpush" >/dev/null || true
+    cp -r --no-preserve=ownership "$new/rootfs/." "$ROOT/"
+    [ -f "$new/BUILD" ] && cp "$new/BUILD" "$APP/BUILD"
+    echo "$3" > "$APP/VERSION"
+    systemctl daemon-reload
+    if [ -f "$new/update-hook.sh" ]; then
+        OLD_VERSION=$2 NEW_VERSION=$3 bash "$new/update-hook.sh" || return 1
+    fi
+    rm -rf "$APP/tftpush.old"
+}
+
+rollback() {  # $1 the version that failed
+    local bak=$STATE/backup f
+    systemctl stop tftpush.service || true
+    rm -rf "$APP/tftpush" "$APP/tftpush.new"
+    if [ -d "$APP/tftpush.old" ]; then mv "$APP/tftpush.old" "$APP/tftpush"
+    else cp -a "$bak/tftpush" "$APP/tftpush"; fi
+    for f in VERSION BUILD; do
+        if [ -e "$bak/$f" ]; then cp -a "$bak/$f" "$APP/$f"; else rm -f "$APP/$f"; fi
+    done
+    [ -d "$bak/files" ] && cp -a "$bak/files/." "$ROOT/"
+    while IFS= read -r f; do [ -n "$f" ] && rm -f "$ROOT/$f"; done < "$bak/added"
+    systemctl daemon-reload || true
+    systemctl start tftpush.service || true
+    echo "$1" > "$STATE/failed"
+    rm -rf "$STATE/new" "$READY"
+    say "rolled back to $(current)"
+}
+
+main "$@"; exit

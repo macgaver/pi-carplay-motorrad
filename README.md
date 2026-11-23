@@ -78,6 +78,7 @@ The most useful ones:
 | `KEYMAP` | e.g. `UP=left,DOWN=right` | Handlebar key to CarPlay command |
 | `CARPLAY_NIGHT` | `0`, `1` | CarPlay dark mode |
 | `PHONE_BATTERY`, `PHONE_SIGNAL` | `auto`, `off`, `0`-`100` | What the bike's status bar shows (the dongle doesn't pass the iPhone's real values) |
+| `AUTO_UPDATE` | `on` (default), `any`, `off` | At power-up on the home Wi-Fi (`any`: also a hotspot), download a new release and ask on the TFT: Update now / Not now |
 
 The full list, with explanations, is in `tftpush/auto.py` (`DEFAULTS`).
 

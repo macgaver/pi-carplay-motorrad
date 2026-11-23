@@ -15,6 +15,8 @@ from functools import lru_cache
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
+from . import __version__
+
 BOLD = ("DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
 
 PINK = (255, 64, 170)
@@ -30,6 +32,9 @@ class Card:
     steps: tuple[str, ...] = ()
     highlight: str = ""          # one big line, e.g. the dongle's Bluetooth name and PIN
     product: str = "Pi CarPlay"
+    version: str = __version__   # shown small in a corner; "" hides it
+    choices: tuple[str, ...] = ()  # buttons under the steps, e.g. ("Update now", "Not now")
+    selected: int = 0              # which button is highlighted
 
 
 @lru_cache(maxsize=64)
@@ -238,7 +243,9 @@ def render(card: Card, w: int, h: int) -> Image.Image:
         b = size * 1.35
         wl = [_wrap(s, size, inner - b - size * 0.4) for s in card.steps]
         tot = sum(len(x) for x in wl) * size * 1.28 + len(wl) * size * 0.35
-        return wl, tot + (hsize * 1.7 if hsize else 0)
+        n = len(card.choices)
+        buttons = (n * size * 1.15 * 1.75 + (n - 1) * size * 0.35 + size * 0.3) if n else 0
+        return wl, tot + (hsize * 1.7 if hsize else 0) + buttons
 
     ssize = int(unit * (0.068 if wide else 0.072))
     wrapped, total = measure(ssize)
@@ -270,4 +277,24 @@ def render(card: Card, w: int, h: int) -> Image.Image:
         y += hsize * 0.25
         d.text((px0 + pw / 2, y + hsize * 0.6), card.highlight, font=font(hsize), fill=YELLOW, anchor="mm",
                stroke_width=max(2, hsize // 10), stroke_fill=INK)
+        y += hsize * 1.45
+    if card.choices:   # stacked buttons: the selected one filled pink with a yellow ring
+        csize = int(ssize * 1.15)
+        bh, gap = csize * 1.75, ssize * 0.35
+        y += ssize * 0.3 - ssize * 0.35
+        for i, label in enumerate(card.choices):
+            on = i == card.selected
+            box = [px0 + pad, y, px1 - pad, y + bh]
+            d.rounded_rectangle(box, radius=int(bh / 2), fill=PINK if on else (30, 14, 60),
+                                outline=YELLOW if on else (150, 120, 200), width=max(2, int(csize * (0.14 if on else 0.06))))
+            d.text(((box[0] + box[2]) / 2, y + bh / 2), ("\u25b6  " if on else "") + label, font=font(csize),
+                   fill=WHITE, anchor="mm", stroke_width=max(1, csize // 14) if on else 0, stroke_fill=INK)
+            y += bh + gap
+
+    # --- version, bottom-left under the brand (wide) or in the top-right corner (square) --
+    if card.version:
+        vsize = max(12, int(unit * (0.065 if wide else 0.045)))
+        vx, vy, anchor = (bx + w * 0.005, h * 0.93, "ls") if wide else (w * 0.97, h * 0.015, "ra")
+        d.text((vx, vy), f"v{card.version}", font=font(vsize), fill=CYAN, anchor=anchor,
+               stroke_width=max(2, vsize // 8), stroke_fill=INK)
     return img

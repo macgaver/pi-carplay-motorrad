@@ -11,6 +11,13 @@ WIFI_PASSWORD=@WIFI_PASSWORD@
 WIFI2_SSID=
 WIFI2_PASSWORD=
 
+# --- Updates ---
+# on:  at power-up on the home Wi-Fi above, download a new release from GitHub, then ask
+#      on the TFT: Update now / Not now (default). Nothing is installed without a yes.
+# any: also on any other network, e.g. the phone hotspot (uses mobile data)
+# off: never look
+AUTO_UPDATE=on
+
 # --- Bluetooth ---
 # The name the bike shows in Settings > Connections > Mobile device.
 BT_NAME=Pi CarPlay
