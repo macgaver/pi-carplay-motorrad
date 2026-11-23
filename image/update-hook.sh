@@ -8,7 +8,9 @@
 # wait for it (nm-online -q -t 30) before anything that needs the internet.
 set -euo pipefail
 
-systemctl enable tftpush.service tftpush-bootconf.service tftpush-update.timer >/dev/null 2>&1 || true
+systemctl enable tftpush.service tftpush-bootconf.service >/dev/null 2>&1 || true
+# Running from now on, not only from the next boot (a Pi updated from a build without it).
+systemctl enable --now tftpush-update.timer >/dev/null 2>&1 || true
 
 # Example, for a release that needs a new package:
 #   dpkg -s foo >/dev/null 2>&1 || {

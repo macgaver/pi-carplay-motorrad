@@ -1,4 +1,4 @@
-# New version: put it in the VERSION file (e.g. 0.9.705), commit, then tag it with a "v":
+# New version: put it in the VERSION file (e.g. 1.0.1), commit, then tag it with a "v":
 #   git tag v$(cat VERSION) && git push origin main v$(cat VERSION)
 # The tag must match the VERSION file (the build stops otherwise).
 # This builds and attaches to the GitHub release of that tag (created if it doesn't exist):
@@ -7,6 +7,9 @@
 #   SHA256SUMS
 # Pis only pick up the "latest" release: mark a release as pre-release to keep it away from them.
 # Needs the repository secret UPDATE_SIGNING_KEY (see tools/release-keygen.sh).
+# Runs on GitHub's ubuntu-24.04 machines, or on your own runner: set the repository variable
+# RELEASE_RUNNER to its label (e.g. pi-image). That machine needs x86-64 Linux, passwordless
+# sudo, FUSE, and ~20 GB free.
 name: Release
 
 on:
@@ -27,7 +30,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.RELEASE_RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 120
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
@@ -69,6 +72,7 @@ jobs:
           pytest -q
 
       - name: Make room on the runner
+        if: runner.environment == 'github-hosted'   # never on your own machine
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h /

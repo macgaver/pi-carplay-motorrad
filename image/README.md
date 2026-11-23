@@ -65,14 +65,14 @@ onboard radio, so the home Wi-Fi (and SSH over it) drops while the TFT link is u
 
 ## Releases and self-update
 
-The version lives in one place: the `VERSION` file at the root of the repo (e.g. `0.9.704`).
+The version lives in one place: the `VERSION` file at the root of the repo (e.g. `1.0.0`).
 The TFT shows it on the status screens (bottom left on the wide screen, top right on the
 square one), and `tftpush-status` prints it.
 
 To publish a version:
 
 ```sh
-echo 0.9.705 > VERSION && git commit -am "Version 0.9.705"
+echo 1.0.1 > VERSION && git commit -am "Version 1.0.1"
 git tag v$(cat VERSION) && git push origin main v$(cat VERSION)
 ```
 

@@ -52,7 +52,13 @@ main() {
 
     mkdir -p "$STATE"
     exec 9>"$STATE/lock"
-    flock -w 30 9 || { say "another update is running"; return 1; }
+    if [ "$action" = install ] || [ "$action" = now ]; then
+        flock -w 30 9 || { say "another update is running"; return 1; }
+    elif ! flock -n 9; then
+        # An install is running (it restarts tftpush, whose power-up check lands here): there
+        # is nothing to download meanwhile, and the TFT link must not wait for it.
+        say "an update is being installed; not looking now"; return 0
+    fi
 
     case "$action" in
         download) download "$force" ;;

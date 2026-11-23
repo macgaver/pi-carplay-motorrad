@@ -167,7 +167,7 @@ async def check_at_power_up(cfg: dict[str, str], run: Runner = _run, state_dir: 
         log.warning("update download failed (exit %d); carrying on as usual", rc)
         return None
     v = ready_version(state_dir)
-    log.info("update %s downloaded in %.0f s; asking the rider" % (v, time.monotonic() - t0) if v
+    log.info("update %s ready after %.0f s; asking the rider" % (v, time.monotonic() - t0) if v
              else "no new version")
     return v
 
