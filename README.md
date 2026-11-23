@@ -46,6 +46,7 @@ Tested on a real bike (10.25" TFT, Pi 4, Carlinkit A15W, iPhone):
   more than 5 hours of riding. Powering it from one of the bike's internal 12 V wires (so it
   follows the ignition) will be tested this winter. Found a good solution? Please share it in
   this repo's [Discussions](https://github.com/macgaver/bmw-carplay/discussions).
+  You can put the raspberry pi under the passenger seat with this cover replacement 3d model: https://www.thingiverse.com/thing:7439704/files
 - A BMW Motorrad bike with the 10.25" Connectivity TFT and navigation.
 
 ## Quick start
