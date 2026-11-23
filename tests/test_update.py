@@ -34,10 +34,11 @@ def test_network_is_the_home_wifi_or_ethernet():
 class FakeNet:
     """nmcli stand-in with a clock that moves one second per sleep."""
 
-    def __init__(self, connect_after=None, seen=("Neighbour",)):
+    def __init__(self, connect_after=None, seen=("Neighbour",), device=lambda t: "disconnected"):
         self.t = 0.0
         self.connect_after = connect_after
         self.seen = seen
+        self.device = device       # wlan0's state at time t, while not connected
         self.calls = []
 
     def clock(self):
@@ -53,6 +54,10 @@ class FakeNet:
             return 0, "bmw-carplay-wifi:802-11-wireless:activated\n" if up else ""
         if "list" in cmd:
             return 0, "\n".join(self.seen) + "\n"
+        if cmd[-1] == "device":
+            st = self.device(self.t)
+            conn = "bmw-carplay-wifi" if st.startswith("connecting") else ""
+            return 0, f"wifi:{st}:{conn}\nloopback:connected (externally):lo\n"
         return 1, ""
 
 
@@ -77,6 +82,31 @@ def test_keeps_waiting_while_the_home_wifi_is_in_range_but_slow():
     assert wait({"WIFI_SSID": "Home"}, net) is True and net.t == 15
     net = FakeNet(connect_after=None, seen=("Home",))
     assert wait({"WIFI_SSID": "Home"}, net) is False and net.t >= update.WAIT_FOR_WIFI
+
+
+def test_stops_at_once_when_the_home_wifi_refuses_the_password():
+    net = FakeNet(seen=("Home",), device=lambda t: "connecting (need authentication)" if t >= 3 else "disconnected")
+    assert wait({"WIFI_SSID": "Home"}, net) is False and net.t == 3
+
+
+def test_stops_when_a_connection_attempt_fails():
+    # tried from 2 s to 5 s (e.g. no DHCP answer), then NetworkManager gave up
+    net = FakeNet(seen=("Home",), device=lambda t: "connecting (getting IP configuration)" if 2 <= t < 5 else "disconnected")
+    assert wait({"WIFI_SSID": "Home"}, net) is False and net.t == 5
+
+
+def test_a_slow_but_working_connection_is_waited_for():
+    net = FakeNet(connect_after=12, seen=("Home",),
+                  device=lambda t: "connecting (configuring)" if t >= 2 else "disconnected")
+    assert wait({"WIFI_SSID": "Home"}, net) is True and net.t == 12
+
+
+def test_home_wifi_attempt_reads_nmcli_device():
+    home = {"bmw-carplay-wifi"}
+    assert update.home_wifi_attempt("wifi:connecting (need authentication):bmw-carplay-wifi\n", home) == "refused"
+    assert update.home_wifi_attempt("wifi:connecting (prepare):bmw-carplay-wifi\n", home) == "trying"
+    assert update.home_wifi_attempt("wifi:connecting (prepare):Other\n", home) is None
+    assert update.home_wifi_attempt("wifi:disconnected:\nethernet:unavailable:\n", home) is None
 
 
 def test_no_wifi_set_up_or_updates_off_costs_nothing():
@@ -218,6 +248,36 @@ def test_daemon_asks_on_the_tft_when_a_download_is_ready(tmp_path, monkeypatch):
         d.carplay.on_key(key(Key.RIGHT))                          # "Update now" is preselected
     asyncio.run(go())
     assert started == [1] and d.update_prompt.state == "updating"
+
+
+def test_only_the_wifi_direct_step_waits_for_the_update_check(tmp_path, monkeypatch):
+    """The Bluetooth half of the TFT link runs during the update check; taking the radio waits."""
+    from tftpush import auto, wifi
+
+    d = auto.Daemon(tmp_path / "bmw-carplay.txt", tmp_path)
+    took_radio = []
+    iface = wifi.WifiIface("wlan0", "sdio")
+    monkeypatch.setattr(wifi, "list_ifaces", lambda: [iface])
+    monkeypatch.setattr(wifi, "choose", lambda ifaces, want: iface)
+
+    async def prepare(i):
+        took_radio.append(i.name)
+        return i.name
+    monkeypatch.setattr(wifi, "prepare", prepare)
+
+    async def go():
+        done = asyncio.Event()
+        d._update_check = asyncio.create_task(done.wait())
+        session = asyncio.create_task(d._wifi_prepare())
+        await asyncio.sleep(0.05)
+        assert took_radio == []              # still downloading: the radio stays with the home Wi-Fi
+        session.cancel()                     # a session given up meanwhile...
+        await asyncio.sleep(0)
+        assert not d._update_check.cancelled()   # ...doesn't stop the update check
+        session = asyncio.create_task(d._wifi_prepare())
+        done.set()
+        assert await session == "wlan0" and took_radio == ["wlan0"]
+    asyncio.run(go())
 
 
 def test_daemon_goes_back_to_carplay_if_the_install_cannot_start(tmp_path, monkeypatch):

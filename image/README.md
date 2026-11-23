@@ -96,10 +96,12 @@ enable). It never touches `bmw-carplay.txt`, so the rider's settings stay as the
 
 On the Pi, nothing is installed without the rider saying so:
 
-1. At power-up, if the home Wi-Fi (`WIFI_SSID`) is in range, tftpush waits for it to
-   connect (up to ~25 s), looks for a newer release, and downloads it before the BMW link
-   takes the radio. Away from home it goes on after a few seconds at most: as soon as the
-   Wi-Fi scan shows the home network isn't there. With no Wi-Fi set up there is no wait.
+1. At power-up, if the home Wi-Fi (`WIFI_SSID`) is in range, tftpush looks for a newer
+   release and downloads it. The BMW link does its Bluetooth part meanwhile; only its
+   Wi-Fi Direct step (which takes the same radio on a Pi without a USB adapter) waits.
+   The wait ends as soon as the home Wi-Fi connects, fails to connect (wrong password,
+   no DHCP), or the Wi-Fi scan shows it isn't around (a few seconds away from home); 25 s
+   at most. With no Wi-Fi set up there is no wait.
 2. Downloaded (signature checked)? The TFT shows **New version ready** with
    **Update now / Not now**, over CarPlay. UP/DOWN choose, RIGHT confirms, LEFT = not now.
    No answer in 90 s = not now. "Not now" asks again at the next power-up at home.

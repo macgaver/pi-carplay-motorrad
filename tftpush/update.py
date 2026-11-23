@@ -2,9 +2,11 @@
 
 1. Right after power-up, if the home Wi-Fi (WIFI_SSID in bmw-carplay.txt) is there, look for
    a newer GitHub release and download it (tftpush-update --download: signature checked,
-   kept in /var/lib/tftpush/update/ready). The BMW link waits meanwhile, because on a Pi
-   without a USB Wi-Fi adapter it takes the same radio. Away from home this costs a few
-   seconds at most: once the Wi-Fi scan shows the home network isn't around, we go on.
+   kept in /var/lib/tftpush/update/ready). The BMW link does its Bluetooth part meanwhile;
+   only its Wi-Fi Direct step waits, because on a Pi without a USB Wi-Fi adapter it takes
+   the same radio. The wait ends as soon as the home Wi-Fi connects, or NetworkManager
+   fails to connect to it (wrong password, no DHCP), or the Wi-Fi scan shows it isn't
+   around (a few seconds away from home).
 2. If a new version is ready, the TFT asks "Update now / Not now" over the status card or
    CarPlay. UP/DOWN (or the wheel) choose, RIGHT/OK confirm, LEFT/BACK = not now. No answer
    within PROMPT_TIMEOUT seconds of the question showing = not now.
@@ -63,6 +65,20 @@ def mode(cfg: dict[str, str]) -> str:
     return "off" if m in ("off", "no", "0", "false") else ("any" if m == "any" else "on")
 
 
+def home_wifi_attempt(devices: str, profiles: set[str]) -> str | None:
+    """`nmcli -t -f TYPE,STATE,CONNECTION device` -> "refused" (asked for the password again:
+    it is wrong), "trying" (connecting to a home profile), or None (not trying right now)."""
+    for line in devices.splitlines():
+        parts = line.rsplit(":", 2)
+        if len(parts) != 3 or parts[0] != "wifi" or parts[2].replace("\\:", ":") not in profiles:
+            continue
+        if "need auth" in parts[1]:
+            return "refused"
+        if parts[1].startswith("connecting"):
+            return "trying"
+    return None
+
+
 def network_ok(active: str, how: str) -> bool:
     """`nmcli -t -f NAME,TYPE,STATE connection show --active` -> on the home Wi-Fi or Ethernet."""
     for line in active.splitlines():
@@ -83,7 +99,9 @@ async def wait_for_network(cfg: dict[str, str], run: Runner = _run, clock=time.m
         return False
     ssid = cfg.get("WIFI_SSID", "").strip()
     wanted = {s for s in (ssid, cfg.get("WIFI2_SSID", "").strip() if how == "any" else "") if s}
+    profiles = {HOME_PROFILE} | ({HOME_PROFILE + "2"} if how == "any" else set())
     start = clock()
+    tried = False
     while True:
         rc, active = await run("nmcli", "-t", "-f", "NAME,TYPE,STATE", "connection", "show", "--active")
         if rc == 127:
@@ -92,6 +110,18 @@ async def wait_for_network(cfg: dict[str, str], run: Runner = _run, clock=time.m
             return True
         if not wanted:
             return False               # no Wi-Fi set up: only an Ethernet already up counts
+        # Stop as soon as NetworkManager has tried the home Wi-Fi and failed (wrong password,
+        # no DHCP answer, out of range): it would only retry the same thing.
+        rc, devices = await run("nmcli", "-t", "-f", "TYPE,STATE,CONNECTION", "device")
+        attempt = home_wifi_attempt(devices, profiles) if rc == 0 else None
+        if attempt == "refused":
+            log.info("home Wi-Fi refused the password (WIFI_PASSWORD); no update check")
+            return False
+        if attempt == "trying":
+            tried = True
+        elif tried:
+            log.info("could not connect to the home Wi-Fi; no update check")
+            return False
         waited = clock() - start
         if waited >= WAIT_FOR_WIFI:
             return False

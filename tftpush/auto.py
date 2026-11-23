@@ -496,6 +496,13 @@ class Daemon:
         reset = getattr(self, "_wifi_reset", None)
         if reset is not None:
             await reset  # never let the start-up hand-back undo our take-over
+        check = self._update_check
+        if check is not None and not check.done():
+            # The Bluetooth half of the link is done; the radio is next, and on a Pi without a
+            # USB adapter it is the one the update download uses. Shielded: a session given up
+            # meanwhile must not cancel the update check.
+            log.info("Wi-Fi Direct waits for the update check (home Wi-Fi)")
+            await asyncio.shield(check)
         ifaces = wifi.list_ifaces()
         chosen = wifi.choose(ifaces, self.cfg["P2P_IFACE"])
         if chosen is None:
@@ -747,7 +754,8 @@ class Daemon:
         # the home Wi-Fi from bmw-carplay.txt down until a session ends. Hand it back now; the
         # session takes it again once the TFT answers. In the background: costs ~1 s.
         self._wifi_reset = asyncio.create_task(self._give_back_onboard_wifi())
-        # Meanwhile, look for an update on the home Wi-Fi (the TFT link waits for it below).
+        # Meanwhile, look for an update on the home Wi-Fi. The TFT link starts its Bluetooth
+        # part at once; only its Wi-Fi Direct step waits for this (see _wifi_prepare).
         self._update_check = asyncio.create_task(self._check_update())
         await self._start_phone_status(*phone_switches)
         configured = normalise_addr(cfg["TFT_ADDR"]) if cfg["TFT_ADDR"] else None
@@ -766,10 +774,6 @@ class Daemon:
         advertise = asyncio.create_task(bt.advertise())
         await asyncio.sleep(1)
         log.info("Bluetooth name %r; pairing mode %s", cfg["BT_NAME"], cfg["PAIRING"])
-
-        if not self._update_check.done():
-            log.info("TFT link waits for the update check (home Wi-Fi)")
-            await self._update_check
 
         visible: bool | None = None
         tick = 0
