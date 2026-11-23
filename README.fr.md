@@ -53,6 +53,8 @@ Testé sur une vraie moto (TFT 10,25", Pi 4, Carlinkit A15W, iPhone) :
   fils 12 V internes de la moto (pour qu'il suive le contact) sera testée cet hiver. Vous avez
   trouvé une bonne solution ? Partagez-la dans les
   [Discussions](https://github.com/macgaver/bmw-carplay/discussions) de ce dépôt.
+  Vous pouvez imprimer 3D ce model pour remplacer le couvercle du petit coffre sous le siège passager de la R1300RT: https://www.thingiverse.com/thing:7439704/files
+
 - Une moto BMW Motorrad avec le TFT Connectivity 10,25" et la navigation.
 
 ## Démarrage rapide
