@@ -1,177 +1,201 @@
 [English](README.md) | **Français**
 
-# pi-carplay-motorrad (100 % sans fil)
+# Pi CarPlay pour BMW Motorrad
 
-Apple CarPlay sur l'écran TFT 10,25" d'une moto BMW Motorrad, grâce à un Raspberry Pi et à
-un adaptateur CarPlay sans fil Carlinkit. Le Pi se fait passer pour un téléphone qui roule
-l'application BMW Connected : les écrans de navigation de la moto affichent CarPlay, et les
-commandes au guidon le pilotent. Aucun câble vers la moto ni vers l'iPhone : l'iPhone parle à
-l'adaptateur en CarPlay sans fil, et le Pi parle au TFT en Bluetooth et en Wi-Fi Direct. Le
-programme qui tourne sur le Pi s'appelle `tftpush`.
+**Apple CarPlay sur l'écran 10,25" de votre moto BMW, 100 % sans fil.**
 
-![Écran Pi CarPlay sur le grand écran de navigation, en attente de l'iPhone](docs/screen-wide.jpg)
+Un petit boîtier Raspberry Pi et un adaptateur CarPlay font afficher CarPlay sur l'écran de
+navigation de votre moto : cartes, musique, messages. Vous le pilotez avec les commandes au
+guidon. Rien n'est branché à la moto ni au téléphone ; le boîtier se range sous la selle ou
+dans une sacoche de réservoir.
 
-*L'écran que la moto affiche tant que l'iPhone n'est pas connecté (grand écran de
-navigation). Une fois connecté, CarPlay le remplace.*
+![L'écran de la moto, prêt à connecter votre iPhone](docs/screen-wide.jpg)
 
-> Projet personnel expérimental, sans lien avec BMW ni Apple. Faites l'installation moto à
-> l'arrêt, et gardez les yeux sur la route.
+![Les liaisons : iPhone, adaptateur CarPlay, boîtier Pi, écran de la moto](docs/how-it-connects.fr.svg)
 
-## Ce qui fonctionne
+> Projet personnel, sans lien avec BMW ni Apple. Faites l'installation moto à l'arrêt, et
+> gardez les yeux sur la route.
 
-Testé sur une vraie moto (TFT 10,25", Pi 4, Carlinkit A15W, iPhone) :
+**L'installation prend environ 30 minutes, une seule fois.** Ensuite, CarPlay s'affiche tout
+seul à chaque sortie.
 
-- CarPlay sur les **deux** écrans de navigation : le grand écran large (1920x464) et la
-  petite case carrée (640x640), avec passage de l'un à l'autre en roulant.
-- Commandes au guidon : HAUT/BAS = élément suivant/précédent, DROITE = sélectionner,
-  GAUCHE = retour (modifiable avec `KEYMAP`). Les commandes restent à CarPlay ; elles ne
-  changent pas le volume.
-- Le son de CarPlay passe par l'audio Bluetooth de la moto.
-- Aucune manipulation : le Pi démarre avec le contact, trouve la moto et l'iPhone tout seul,
-  et se rétablit de lui-même quand le Bluetooth ou le Wi-Fi décroche (voir
-  [Reprise automatique](#reprise-automatique)).
-- Jumelage réservé à votre moto : une fois jumelée, seule cette moto peut se jumeler de
-  nouveau, sauf pendant les 3 minutes après la mise sous tension (pour jumeler un nouveau
-  TFT sans ordinateur).
-- Plusieurs heures de route sans décrochage.
+---
 
-## Matériel requis
+## Étape 1 : achetez le matériel
 
-- Un **Raspberry Pi 4** (1 Go suffit largement : l'ensemble utilise environ 265 Mo pendant
-  la diffusion). Au Canada :
-  [Raspberry Pi 4 Model B 1 Go chez PiShop.ca](https://www.pishop.ca/product/raspberry-pi-4-model-b-1gb/).
-  Un Pi 5 devrait fonctionner avec la même image, mais n'a pas encore été
-  essayé ; il lui faut une alimentation 5 V / 5 A, sinon il limite ses ports USB et
-  l'adaptateur risque de décrocher.
-- Un **adaptateur USB CarPlay sans fil Carlinkit** (famille CPC200-CCPA, USB
-  `1314:1520/1521` ; testé : A15W, qui apparaît sous le nom « AutoKit-xxxx »). Par exemple :
-  [adaptateur USB CarPlay sur Amazon](https://a.co/d/0bSMkhVc).
-- Une carte microSD rapide de **32 Go ou plus** (A1/A2, U3), pour un démarrage rapide à
-  chaque mise du contact. Par exemple : [cartes microSD sur Amazon.ca](https://www.amazon.ca/Micro-SD-Cards/b?ie=UTF8&node=3381334011).
-- De quoi alimenter le Pi. Pour l'instant, il a été testé sur une **batterie USB de
-  10 000 mAh** : aucun problème pendant plus de 5 heures de route. L'alimentation par un des
-  fils 12 V internes de la moto (pour qu'il suive le contact) sera testée cet hiver. Vous avez
-  trouvé une bonne solution ? Partagez-la dans les
-  [Discussions](https://github.com/macgaver/bmw-carplay/discussions) de ce dépôt.
-  Vous pouvez imprimer 3D ce model pour remplacer le couvercle du petit coffre sous le siège passager de la R1300RT: https://www.thingiverse.com/thing:7439704/files
+| | Quoi | Remarques | Exemple |
+| --- | --- | --- | --- |
+| 1 | **Raspberry Pi 4 Model B** | 1 Go de mémoire suffit largement | [PiShop.ca](https://www.pishop.ca/product/raspberry-pi-4-model-b-1gb/) |
+| 2 | **Adaptateur USB CarPlay sans fil Carlinkit** | Testé : Carlinkit A15W (apparaît sous le nom « AutoKit-… ») | [Amazon](https://a.co/d/0bSMkhVc) |
+| 3 | **Carte microSD de 32 Go ou plus** | Une carte rapide (marquée A1 ou A2) : le boîtier démarre plus vite | [Amazon.ca](https://www.amazon.ca/Micro-SD-Cards/b?ie=UTF8&node=3381334011) |
+| 4 | **Batterie USB de 10 000 mAh** + un **câble USB-C** | Choisissez-en une qui fournit 3 A (15 W) ou plus. Testé : plus de 5 heures de route | Toute bonne marque |
+| 5 | Un **boîtier** pour le Pi 4 | Facultatif, mais il protège le Pi | N'importe quel boîtier Pi 4 |
 
-- Une moto BMW Motorrad avec le TFT Connectivity 10,25" et la navigation.
+Il vous faut aussi :
+- une **moto BMW Motorrad avec l'écran Connectivity 10,25" et la navigation**,
+- un **iPhone** compatible CarPlay,
+- un **ordinateur avec un lecteur de carte microSD**, une seule fois, pour préparer la carte.
 
-## Démarrage rapide
+## Étape 2 : téléchargez le logiciel
 
-1. Construisez l'image de la carte SD (`image/build.sh`, voir
-   [image/README.md](image/README.md), en anglais) et gravez-la.
-2. Facultatif : ouvrez la partition `bootfs` de la carte sur n'importe quel ordinateur et
-   inscrivez votre Wi-Fi maison dans `bmw-carplay.txt` (seulement pour les mises à jour et
-   SSH ; la moto n'en a pas besoin).
-3. Branchez l'adaptateur sur le Pi et alimentez le Pi.
-4. Sur la moto : Réglages > Connexions > Appareil mobile > nouveau jumelage, choisissez
-   **Pi CarPlay** et confirmez le code.
-5. Sur l'iPhone : Réglages > Bluetooth, touchez l'adaptateur (AutoKit-xxxx), puis
-   « Utiliser CarPlay ». Le TFT affiche aussi ces étapes.
-6. Ouvrez la navigation de la moto. Ensuite, tout se connecte tout seul à chaque sortie.
+Ouvrez la **[dernière version](https://github.com/macgaver/pi-carplay-motorrad/releases/latest)**
+et téléchargez le fichier **`pi-carplay-motorrad-<version>.img.xz`** (environ 900 Mo).
 
-Voyant vert du Pi : clignotement lent = en attente de jumelage, clignotement rapide =
-connexion en cours, fixe = image sur le TFT.
+Ne le décompressez pas ; l'étape suivante le lit tel quel.
 
-## Réglages
+## Étape 3 : copiez le logiciel sur la carte microSD
 
-Tous les réglages sont dans `bmw-carplay.txt`, sur la partition `bootfs` de la carte ; ils
-sont relus à chaque démarrage. Les plus utiles :
+1. Installez **[Raspberry Pi Imager](https://www.raspberrypi.com/software/)** (gratuit, pour
+   Windows, macOS et Linux) et insérez la carte microSD dans votre ordinateur.
+2. Dans Raspberry Pi Imager :
+   - **Appareil** : *Raspberry Pi 4*.
+   - **Système d'exploitation** : descendez tout en bas, choisissez **Use custom**
+     (image personnalisée), puis le fichier téléchargé.
+   - **Stockage** : votre carte microSD.
+3. Cliquez sur **Suivant**. Si Imager propose de **personnaliser le système** (nom
+   d'utilisateur, Wi-Fi…), répondez **Non** / passez : la carte contient déjà tout ce qu'il
+   faut.
+4. Confirmez, et attendez qu'Imager indique que c'est terminé (quelques minutes).
+
+## Étape 4 (recommandée) : ajoutez votre Wi-Fi maison, pour les mises à jour
+
+Avec votre Wi-Fi maison sur la carte, le boîtier se met à jour quand une nouvelle version
+sort (il vous le demande d'abord, sur l'écran de la moto). La moto, elle, n'en a pas besoin.
+
+1. Retirez la carte et réinsérez-la. Un lecteur nommé **`bootfs`** apparaît.
+   > Sous Windows, un message peut proposer de **formater** un disque : cliquez sur
+   > **Annuler**. C'est l'autre partie de la carte, que Windows ne sait pas lire. Ne la
+   > formatez pas.
+2. Ouvrez **`bmw-carplay.txt`** sur `bootfs` avec le Bloc-notes (Windows) ou TextEdit (Mac).
+3. Remplissez ces trois lignes, puis enregistrez :
+   ```
+   WIFI_COUNTRY=CA
+   WIFI_SSID=Le nom de votre Wi-Fi
+   WIFI_PASSWORD=Le mot de passe de votre Wi-Fi
+   ```
+   `WIFI_COUNTRY` est le code à deux lettres de votre pays : `CA`, `FR`, `BE`, `CH`, `US`, …
+4. Éjectez la carte.
+
+## Étape 5 : assemblez le boîtier
+
+1. Glissez la carte microSD dans la fente **sous** le Pi.
+2. Branchez l'**adaptateur CarPlay** sur un des ports USB du Pi (n'importe lequel des quatre).
+3. Mettez le Pi dans son boîtier.
+
+## Étape 6 : alimentez-le
+
+**Simple : batterie USB.** Branchez la batterie sur le port **USB-C** du Pi. Le Pi démarre dès
+qu'il est alimenté. Rechargez la batterie entre les sorties, et débranchez le Pi quand la moto
+est stationnée, pour ne pas vider la batterie.
+
+**Avancé : courant de la moto.** Relié à un circuit 12 V qui suit le contact, par un
+**convertisseur 12 V → 5 V USB-C (3 A)**, le boîtier démarre et s'arrête avec la moto. Ce
+n'est pas encore entièrement testé. Si le câblage d'une moto ne vous est pas familier,
+confiez-le à un atelier. Vous avez trouvé une bonne solution ? Partagez-la dans les
+[Discussions](https://github.com/macgaver/pi-carplay-motorrad/discussions).
+
+Rangez le boîtier sous la selle ou dans une sacoche de réservoir. Sur la **R1300RT**, il
+loge dans le petit coffre sous le siège passager, avec ce
+[couvercle de remplacement à imprimer en 3D](https://www.thingiverse.com/thing:7439704/files).
+
+## Étape 7 : jumelez le boîtier avec la moto (une fois)
+
+1. Mettez le contact et alimentez le boîtier. Attendez environ **une minute** qu'il démarre :
+   le voyant vert du Pi clignote **lentement** quand il est prêt à être jumelé.
+2. Sur l'écran de la moto : **Réglages > Connexions > Appareil mobile > jumeler un nouvel
+   appareil**.
+3. Choisissez **Pi CarPlay**, et confirmez le code sur la moto. Le boîtier confirme de son
+   côté tout seul.
+
+## Étape 8 : connectez votre iPhone (une fois)
+
+Ouvrez la **navigation** de la moto. L'écran indique quoi faire :
+
+![Écran « Connect your iPhone »](docs/screen-wide.jpg)
+
+1. Sur l'iPhone : **Réglages > Bluetooth**, et touchez l'adaptateur (**AutoKit-…**, le nom
+   qu'affiche l'écran de la moto).
+2. Touchez **Utiliser CarPlay** quand l'iPhone le demande.
+
+Laissez le Wi-Fi et le Bluetooth de l'iPhone activés : CarPlay sans fil a besoin des deux.
+
+**C'est fait.** Désormais, tout se connecte tout seul.
+
+---
+
+## À chaque sortie
+
+1. Mettez le contact (et alimentez le boîtier s'il est sur batterie).
+2. Ouvrez la **navigation** de la moto. CarPlay s'affiche en une minute environ.
+
+| Commande au guidon | Dans CarPlay |
+| --- | --- |
+| HAUT / BAS | Élément suivant / précédent |
+| DROITE | Sélectionner |
+| GAUCHE | Retour (maintenue : écran d'accueil) |
+
+- CarPlay s'affiche sur les **deux** écrans de navigation, le grand écran large et la petite
+  case carrée, et vous suit quand vous passez de l'un à l'autre.
+- Le son de CarPlay passe par l'audio Bluetooth de la moto (votre intercom de casque).
+- Les commandes de la moto restent à CarPlay tant qu'il est à l'écran ; elles ne changent pas
+  le volume.
+
+## Mises à jour
+
+Si votre Wi-Fi maison est sur la carte (étape 4), le boîtier cherche une nouvelle version
+chaque fois qu'il démarre à la maison. S'il y en a une, l'écran de la moto demande :
+
+![Nouvelle version prête : Update now (mettre à jour) ou Not now (plus tard)](docs/screen-update.jpg)
+
+- **HAUT / BAS** pour choisir, **DROITE** pour confirmer.
+- **Update now** (mettre à jour) : gardez le contact ; CarPlay revient en une minute environ,
+  dans la nouvelle version.
+- **Not now** (plus tard) : CarPlay tout de suite. La question revient au prochain démarrage
+  à la maison.
+
+Le numéro de version est affiché dans le coin des écrans du boîtier.
+
+## En cas de problème
+
+| Ce que vous voyez | Que faire |
+| --- | --- |
+| **« CarPlay dongle not found »** sur l'écran de la moto | L'adaptateur CarPlay n'est pas branché, ou démarre encore. Vérifiez qu'il est sur un port USB du Pi et attendez une minute. |
+| La moto ne trouve pas **Pi CarPlay** | Le boîtier a besoin d'environ une minute après la mise sous tension. Vérifiez que son voyant vert clignote lentement. |
+| Jumeler une **autre moto** | Éteignez et rallumez le boîtier, et jumelez la nouvelle moto dans les 3 minutes. En dehors de ce délai, seule votre moto peut se jumeler. |
+| L'iPhone ne se connecte pas | Activez le Wi-Fi et le Bluetooth de l'iPhone. Sinon, oubliez l'AutoKit dans les réglages Bluetooth de l'iPhone et refaites l'étape 8. |
+| L'écran du boîtier clignote, puis la moto se reconnecte | Normal : le boîtier débloque une connexion coincée tout seul, en général en moins de 30 secondes. |
+| Texte trop petit dans CarPlay | Sur l'iPhone : désactivez le zoom de l'affichage et choisissez une taille de texte plus grande pour CarPlay dans les réglages d'accessibilité. |
+
+![Écran « CarPlay dongle not found »](docs/screen-no-dongle.jpg)
+
+**Voyant vert du Pi :**
+
+| Voyant | Signification |
+| --- | --- |
+| Clignotement lent | En attente de jumelage avec la moto |
+| Clignotement rapide | Connexion à la moto en cours |
+| Allumé, bref clignotement toutes les 2 s | Connecté à la moto, en attente de l'iPhone |
+| Allumé fixe | CarPlay à l'écran de la moto |
+
+## Réglages (facultatif)
+
+`bmw-carplay.txt` sur la carte (étape 4) contient les réglages, relus à chaque démarrage du
+boîtier. Modifiez une ligne, ou ajoutez-la si elle n'y est pas. Les plus utiles :
 
 | Réglage | Valeurs | Effet |
 | --- | --- | --- |
-| `ZOOM` | `small`, `normal` (défaut), `large` | Taille de CarPlay dans la petite case carrée |
-| `SMALL_NAV_VIEW` | `center` (défaut), `left`, `right` | Partie de l'image large montrée dans la case carrée |
-| `PAIRING` | `auto` (défaut), `always`, `off` | Quand le Pi accepte un nouveau jumelage |
-| `PAIRING_WINDOW` | secondes, `180` par défaut | Délai après la mise sous tension pendant lequel un autre TFT peut se jumeler |
-| `KEYMAP` | p. ex. `UP=left,DOWN=right` | Touche du guidon vers commande CarPlay |
+| `ZOOM` | `small`, `normal`, `large` | Taille de CarPlay dans la petite case carrée |
+| `SMALL_NAV_VIEW` | `center`, `left`, `right` | Partie de la carte affichée dans la case carrée |
 | `CARPLAY_NIGHT` | `0`, `1` | Mode sombre de CarPlay |
-| `PHONE_BATTERY`, `PHONE_SIGNAL` | `auto`, `off`, `0`-`100` | Ce qu'affiche la barre d'état de la moto (l'adaptateur ne transmet pas les vraies valeurs de l'iPhone) |
-| `AUTO_UPDATE` | `on` (par défaut), `any`, `off` | Au démarrage sur le Wi-Fi maison (`any` : aussi un partage de connexion), télécharge la nouvelle version et demande sur le TFT : mettre à jour maintenant / plus tard |
+| `BT_NAME` | un nom | Le nom qu'affiche la moto au jumelage |
+| `AUTO_UPDATE` | `on`, `any`, `off` | Mises à jour sur le Wi-Fi maison (`any` : aussi sur un partage de connexion ; `off` : jamais) |
 
-La liste complète, avec explications, est dans `tftpush/auto.py` (`DEFAULTS`).
+## Aide et idées
 
-Pour un texte plus gros sur le grand écran, passez par l'iPhone : désactivez le zoom de
-l'affichage et choisissez une plus grande taille de texte pour CarPlay dans les réglages
-d'accessibilité de l'iPhone. (CarPlay s'ajuste à la hauteur de l'écran ; changer la taille
-de l'image côté Pi n'y change rien.)
+Des questions, des idées, une bonne façon d'alimenter le boîtier par la moto ? Partagez-les
+dans les [Discussions](https://github.com/macgaver/pi-carplay-motorrad/discussions).
 
-## Reprise automatique
+Développeurs : le fonctionnement, le code et la construction du logiciel sont dans
+[docs/DEVELOPERS.fr.md](docs/DEVELOPERS.fr.md).
 
-Le Pi n'abandonne jamais ; chaque panne mène à une nouvelle tentative :
-
-| Problème | Réaction du Pi |
-| --- | --- |
-| Moto éteinte ou hors de portée | Réessaie toutes les 6 s |
-| Le Bluetooth décroche pendant la connexion | Nouvelle tentative aussitôt |
-| Le TFT accepte la connexion mais l'ignore (vu après un plein d'essence) | Après 3 essais, redémarre sa radio Bluetooth ; après 6, tout son logiciel Bluetooth |
-| Le Wi-Fi Direct échoue ou décroche en roulant | Détecté en 15 s, nouvelle tentative |
-| Le TFT affiche l'application mais ne demande aucune image | Redemande après 2 s, nouvelle session après 6 s |
-| Service Bluetooth redémarré ou adaptateur perdu | tftpush redémarre et refait toute la configuration |
-| L'iPhone ne se reconnecte pas à l'adaptateur | Demande à l'adaptateur de se reconnecter toutes les 15 s |
-| Plantage, quel qu'il soit | systemd relance tftpush en moins de 5 s |
-
-## Fonctionnement
-
-1. **Bluetooth.** Le Pi ressemble à un téléphone : classe d'appareil `0x5a020c`, audio
-   (A2DP/HFP) connecté, et l'enregistrement SPP de BMW annoncé (UUID
-   `c707050e-efae-1449-3913-c191e5bb32dc`).
-2. **Ice.** Il ouvre une connexion RFCOMM vers le service BMW du TFT et parle ZeroC Ice
-   (protocole 1.0, encodage 1.1) : `createMySpinICESession`, Hello, code de pays, puis
-   `getMySpinICEveh(WLAN_CREDENTIALS_P2P)` renvoie le nom et le NIP Wi-Fi Direct du TFT.
-3. **Wi-Fi Direct.** Il rejoint le groupe du TFT avec ce NIP WPS et signale « connecté ».
-   Un adaptateur Wi-Fi USB est utilisé s'il y en a un ; sinon la radio intégrée est
-   empruntée (le Wi-Fi maison décroche alors tant que le lien avec la moto est actif).
-4. **mySPIN.** Le TFT annonce son point d'accès en JSON sur UDP 8158. Le Pi s'y connecte en
-   TCP, fait la poignée de main mySPIN de Bosch et déclare les applications BMW.
-5. **Écrans.** Chaque écran de navigation demande ses images de son côté (`screen_id`,
-   taille). Le Pi répond à chaque FrameRequest par un JPEG exactement à cette taille, limité
-   à environ 30 Ko (ce que le TFT accepte). Quand le motard change d'écran, le Pi sonde les
-   autres écrans (type 168) et réenregistre le nouveau (type 164), ce qui garde les deux
-   écrans actifs dans une même session.
-6. **CarPlay.** L'iPhone se connecte à l'adaptateur en CarPlay sans fil ; l'adaptateur
-   envoie la vidéo H.264 en 1920x464 par USB. Le Pi la décode en logiciel (le décodeur
-   matériel du Pi 4 retient 22 images) et ne garde que l'image la plus récente. La case
-   carrée reçoit un découpage carré centré sur la carte.
-7. **Commandes.** Les touches du guidon arrivent comme CustomData mySPIN et partent vers
-   l'adaptateur comme commandes de molette CarPlay. Le Pi envoie `MMC_FOCUS` par Ice quand
-   son application est à l'avant-plan, pour que le TFT cesse d'utiliser les touches pour le
-   volume.
-
-Les formats de protocole viennent de la rétro-ingénierie publique de
-[MOTO-HUB](https://github.com/vincenzobpt/MOTO-HUB) et
-[open-connected-tft](https://github.com/vandelayautollc/open-connected-tft). Ce code est une
-implémentation indépendante sous licence MIT ; aucun code n'a été copié de ces projets.
-
-## Plan du code
-
-| Module | Rôle |
-| --- | --- |
-| `tftpush/auto.py` | Mode autonome : réglages, agent et verrou de jumelage, boucle de session, reprise, voyant |
-| `tftpush/bt.py` | Enregistrement SDP, connexion RFCOMM avec reprise, trames Ice et battement de cœur |
-| `tftpush/ice.py`, `tftpush/ice_dialog.py` | Codec Ice ; dialogue Bluetooth jusqu'aux identifiants Wi-Fi Direct |
-| `tftpush/wifi.py`, `tftpush/p2p.py` | Choix de l'interface Wi-Fi, `wpa_supplicant` dédié, connexion Wi-Fi Direct |
-| `tftpush/myspin.py`, `tftpush/session.py` | Paquets mySPIN, session TCP, images par écran, surveillance des démarrages bloqués |
-| `tftpush/carlinkit/` | Protocole USB Carlinkit, pilote de l'adaptateur, simulateur |
-| `tftpush/video.py` | Décodage H.264, image la plus récente, découpage pour la case carrée, JPEG par taille d'écran |
-| `tftpush/carplay.py` | Relie adaptateur, vidéo, touches et son ; écrans d'état |
-| `tftpush/cards.py` | Les écrans d'état (dessinés par le code, sans fichiers image) |
-| `tftpush/carplay_input.py`, `tftpush/carplay_audio.py` | Touches vers CarPlay ; son de CarPlay vers la moto |
-| `tftpush/phone_status.py` | Batterie et signal pour la barre d'état de la moto (mains libres) |
-| `tftpush/fake_tft.py` | Simulateur du TFT pour les essais sur table |
-| `image/` | Construit l'image de carte SD prête à graver |
-| `tools/deploy.sh` | Copie le code sur un Pi et redémarre le service |
-
-## Essai sur table (n'importe quel Linux, sans moto)
-
-```sh
-python3 -m venv .venv && . .venv/bin/activate
-pip install -e '.[test,carplay]'
-pytest -q
-tftpush carplay-desk --out frames   # faux adaptateur + faux TFT : tout le chemin CarPlay
-```
-
-La case carrée affiche le même écran d'état, empilé :
-
-![Écran Pi CarPlay dans la case carrée](docs/screen-square.jpg)
+Licence MIT, voir [LICENSE](LICENSE).

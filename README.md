@@ -1,164 +1,196 @@
 **English** | [Français](README.fr.md)
 
-# pi-carplay-motorrad (100% Wireless)
+# Pi CarPlay for BMW Motorrad
 
-Apple CarPlay on the 10.25" TFT of a BMW Motorrad bike, through a Raspberry Pi and a
-Carlinkit wireless CarPlay dongle. The Pi passes itself off as a phone running the BMW
-Connected app: the bike's own nav screens show CarPlay, and the handlebar controls drive it.
-No cable to the bike or the iPhone: the iPhone talks to the dongle over wireless CarPlay, and
-the Pi talks to the TFT over Bluetooth and Wi-Fi Direct. The program on the Pi is `tftpush`.
+**Apple CarPlay on the 10.25" screen of your BMW motorcycle, 100% wireless.**
 
-![Pi CarPlay screen on the wide nav screen, waiting for the iPhone](docs/screen-wide.jpg)
+A small Raspberry Pi box and a CarPlay adapter make your bike's navigation screen show
+CarPlay: maps, music, messages. You drive it with the handlebar controls. Nothing is wired
+to the bike or the phone; you put the box under the seat or in a tank bag.
 
-*The screen the bike shows until your iPhone is connected (wide nav screen). Once it is,
-CarPlay replaces it.*
+![The bike's screen, ready to connect your iPhone](docs/screen-wide.jpg)
 
-> Experimental hobby project, not affiliated with BMW or Apple. Set it up with the bike
-> parked, and keep your eyes on the road.
+![How it connects: iPhone, CarPlay adapter, Pi box, bike screen](docs/how-it-connects.svg)
 
-## What works
+> Hobby project, not affiliated with BMW or Apple. Do the setup with the bike parked, and
+> keep your eyes on the road.
 
-Tested on a real bike (10.25" TFT, Pi 4, Carlinkit A15W, iPhone):
+**Setup takes about 30 minutes, once.** After that, CarPlay comes up by itself every time
+you ride.
 
-- CarPlay on **both** nav screens: the big wide one (1920x464) and the small square box
-  (640x640), with switching between them while riding.
-- Handlebar controls: UP/DOWN = next/previous item, RIGHT = select, LEFT = back
-  (changeable with `KEYMAP`). The controls stay with CarPlay; they don't change the volume.
-- CarPlay audio through the bike's Bluetooth audio.
-- Hands-off: the Pi starts with the ignition, finds the bike and the iPhone by itself, and
-  recovers on its own when Bluetooth or Wi-Fi drop (see [Recovery](#recovery)).
-- Pairing locked to your bike: once paired, only that bike may pair again, except in the
-  3 minutes after power-up (to pair a new TFT without a laptop).
-- Multi-hour rides without a drop.
+---
 
-## What you need
+## Step 1: Buy the parts
 
-- A **Raspberry Pi 4** (1 GB is plenty: the whole box uses about 265 MB while streaming).
-  In Canada: [Raspberry Pi 4 Model B 1 GB at PiShop.ca](https://www.pishop.ca/product/raspberry-pi-4-model-b-1gb/).
-  A Pi 5 should work with the same image but hasn't been tried yet; it needs a 5 V / 5 A
-  supply, or it limits its USB ports and the dongle may drop out.
-- A **Carlinkit wireless CarPlay USB dongle** (CPC200-CCPA family, USB `1314:1520/1521`;
-  tested: A15W, which shows up as "AutoKit-xxxx"). For example:
-  [CarPlay USB adapter on Amazon](https://a.co/d/0bSMkhVc).
-- A fast microSD card of **32 GB or more** (A1/A2, U3), for a quick boot at every ignition.
-  For example: [microSD cards on Amazon.ca](https://www.amazon.ca/Micro-SD-Cards/b?ie=UTF8&node=3381334011).
-- Power for the Pi. So far it has been tested on a **10,000 mAh USB battery pack**: fine for
-  more than 5 hours of riding. Powering it from one of the bike's internal 12 V wires (so it
-  follows the ignition) will be tested this winter. Found a good solution? Please share it in
-  this repo's [Discussions](https://github.com/macgaver/bmw-carplay/discussions).
-  You can put the raspberry pi under the passenger seat with this cover replacement 3d model: https://www.thingiverse.com/thing:7439704/files
-- A BMW Motorrad bike with the 10.25" Connectivity TFT and navigation.
+| | What | Notes | Example |
+| --- | --- | --- | --- |
+| 1 | **Raspberry Pi 4 Model B** | 1 GB of memory is plenty | [PiShop.ca](https://www.pishop.ca/product/raspberry-pi-4-model-b-1gb/) |
+| 2 | **Carlinkit wireless CarPlay USB adapter** | Tested: Carlinkit A15W (shows up as "AutoKit-…") | [Amazon](https://a.co/d/0bSMkhVc) |
+| 3 | **microSD card, 32 GB or more** | A fast one (marked A1 or A2): the box starts faster | [Amazon.ca](https://www.amazon.ca/Micro-SD-Cards/b?ie=UTF8&node=3381334011) |
+| 4 | **USB battery pack, 10,000 mAh** + a **USB-C cable** | Pick one that gives 3 A (15 W) or more. Tested: over 5 hours of riding | Any good brand |
+| 5 | A **case** for the Pi 4 | Optional, but it protects the box | Any Pi 4 case |
 
-## Quick start
+You also need:
+- a **BMW Motorrad bike with the 10.25" Connectivity screen and navigation**,
+- an **iPhone** with CarPlay,
+- a **computer with a microSD card reader**, just once, to prepare the card.
 
-1. Build the SD-card image (`image/build.sh`, see [image/README.md](image/README.md)) and
-   flash it.
-2. Optional: open the card's `bootfs` partition on any computer and put your home Wi-Fi in
-   `bmw-carplay.txt` (only for updates and SSH; the bike doesn't need it).
-3. Plug the dongle into the Pi and power the Pi.
-4. On the bike: Settings > Connections > Mobile device > pair new, pick **Pi CarPlay**, and
-   confirm the code.
-5. On the iPhone: Settings > Bluetooth, tap the dongle (AutoKit-xxxx), then "Use CarPlay".
-   The TFT shows these steps too.
-6. Open the bike's navigation. From then on, everything connects by itself at every ride.
+## Step 2: Download the software
 
-Green LED on the Pi: slow blink = waiting to be paired, fast blink = connecting, solid =
-picture on the TFT.
+Open the **[latest release](https://github.com/macgaver/pi-carplay-motorrad/releases/latest)**
+and download the file named **`pi-carplay-motorrad-<version>.img.xz`** (about 900 MB).
 
-## Settings
+Don't unzip it; the next step reads it as it is.
 
-All settings are in `bmw-carplay.txt` on the card's `bootfs` partition, read at every boot.
-The most useful ones:
+## Step 3: Put the software on the microSD card
+
+1. Install **[Raspberry Pi Imager](https://www.raspberrypi.com/software/)** (free, for
+   Windows, macOS and Linux) and put the microSD card in your computer.
+2. In Raspberry Pi Imager:
+   - **Device**: *Raspberry Pi 4*.
+   - **Operating system**: scroll to the bottom, pick **Use custom**, and choose the file
+     you downloaded.
+   - **Storage**: your microSD card.
+3. Click **Next**. If Imager offers to **customise the OS** (user name, Wi-Fi…), say
+   **No** / skip it: the card already has everything it needs.
+4. Confirm, and wait until Imager says it's done (a few minutes).
+
+## Step 4 (recommended): Add your home Wi-Fi, for automatic updates
+
+With your home Wi-Fi on the card, the box updates itself when a new version comes out (it
+asks you first, on the bike's screen). The bike itself doesn't need it.
+
+1. Take the card out and put it back in. A drive called **`bootfs`** appears.
+   > On Windows, a message may offer to **format** a disk: click **Cancel**. That is the
+   > card's other part, which Windows can't read. Don't format it.
+2. Open **`bmw-carplay.txt`** on `bootfs` with Notepad (Windows) or TextEdit (Mac).
+3. Fill in these three lines, then save:
+   ```
+   WIFI_COUNTRY=CA
+   WIFI_SSID=The name of your Wi-Fi
+   WIFI_PASSWORD=Your Wi-Fi password
+   ```
+   `WIFI_COUNTRY` is your country's two-letter code: `CA`, `US`, `FR`, `DE`, `GB`, …
+4. Eject the card.
+
+## Step 5: Put the box together
+
+1. Slide the microSD card into the slot **under** the Pi.
+2. Plug the **CarPlay adapter** into one of the Pi's USB ports (any of the four).
+3. Put the Pi in its case.
+
+## Step 6: Power it
+
+**Simple: USB battery pack.** Plug the battery into the Pi's **USB-C** port. The Pi starts as
+soon as it gets power. Charge the battery between rides, and unplug the Pi when the bike is
+parked, so the battery doesn't run flat.
+
+**Advanced: bike power.** Wired to a 12 V circuit that follows the ignition, through a
+**12 V → 5 V USB-C converter (3 A)**, the box starts and stops with the bike. This hasn't
+been fully tested yet. If you're not comfortable with motorcycle wiring, have a shop do it.
+If you find a good setup, please share it in the
+[Discussions](https://github.com/macgaver/pi-carplay-motorrad/discussions).
+
+Put the box under the seat or in a tank bag. On the **R1300RT**, it fits in the small
+compartment under the passenger seat, with this
+[3D-printable replacement cover](https://www.thingiverse.com/thing:7439704/files).
+
+## Step 7: Pair the box with the bike (once)
+
+1. Turn the ignition on and power the box. Wait about **one minute** while it starts: the
+   green light on the Pi blinks **slowly** when it's ready to pair.
+2. On the bike's screen: **Settings > Connections > Mobile device > pair a new device**.
+3. Choose **Pi CarPlay**, and confirm the code on the bike. The box confirms its side by
+   itself.
+
+## Step 8: Connect your iPhone (once)
+
+Open the **navigation** on the bike. The screen shows what to do:
+
+![Connect your iPhone screen](docs/screen-wide.jpg)
+
+1. On the iPhone: **Settings > Bluetooth**, and tap the adapter (**AutoKit-…**, the name
+   the bike's screen shows).
+2. Tap **Use CarPlay** when the iPhone asks.
+
+Keep the iPhone's Wi-Fi and Bluetooth on: wireless CarPlay needs both.
+
+**Done.** From now on, everything connects by itself.
+
+---
+
+## Every ride
+
+1. Turn the ignition on (and power the box if it's on a battery).
+2. Open the **navigation** on the bike. CarPlay appears within about a minute.
+
+| Handlebar control | In CarPlay |
+| --- | --- |
+| UP / DOWN | Next / previous item |
+| RIGHT | Select |
+| LEFT | Back (hold it: home screen) |
+
+- CarPlay shows on **both** navigation screens, the big wide one and the small square
+  box, and follows you when you switch between them.
+- CarPlay sound plays through the bike's Bluetooth audio (your helmet headset).
+- The bike's controls stay with CarPlay while it's on screen; they don't change the
+  volume.
+
+## Updates
+
+If your home Wi-Fi is on the card (step 4), the box looks for a new version each time it
+starts at home. When there is one, the bike's screen asks:
+
+![New version ready: Update now or Not now](docs/screen-update.jpg)
+
+- **UP / DOWN** choose, **RIGHT** confirms.
+- **Update now**: keep the ignition on; CarPlay is back in about a minute, on the new
+  version.
+- **Not now**: CarPlay right away. It asks again next time the box starts at home.
+
+The version number is shown in the corner of the box's screens.
+
+## If something doesn't work
+
+| What you see | What to do |
+| --- | --- |
+| **"CarPlay dongle not found"** on the bike's screen | The CarPlay adapter isn't plugged in, or is still starting. Check it's in a USB port on the Pi and wait a minute. |
+| The bike doesn't list **Pi CarPlay** | The box needs about a minute after power-up. Check its green light blinks slowly. |
+| Pairing a **different bike** | Switch the box off and on, and pair the new bike within 3 minutes. Only your bike can pair outside of that. |
+| The iPhone doesn't connect | Turn the iPhone's Wi-Fi and Bluetooth on. If it still won't, forget the AutoKit in the iPhone's Bluetooth settings and do step 8 again. |
+| The box's screen flashes, then the bike reconnects | Normal: the box fixes a stuck connection by itself, usually within 30 seconds. |
+| Text too small in CarPlay | On the iPhone: turn Display Zoom off and choose a larger text size for CarPlay in the Accessibility settings. |
+
+![CarPlay dongle not found screen](docs/screen-no-dongle.jpg)
+
+**Green light on the Pi:**
+
+| Light | Meaning |
+| --- | --- |
+| Slow blink | Waiting to be paired with the bike |
+| Fast blink | Connecting to the bike |
+| On, short blink every 2 s | Connected to the bike, waiting for the iPhone |
+| Steady on | CarPlay on the bike's screen |
+
+## Settings (optional)
+
+`bmw-carplay.txt` on the card (step 4) holds the settings, read each time the box starts.
+Change a line, or add it if it isn't there. The most useful ones:
 
 | Setting | Values | What it does |
 | --- | --- | --- |
-| `ZOOM` | `small`, `normal` (default), `large` | Size of CarPlay in the small square nav box |
-| `SMALL_NAV_VIEW` | `center` (default), `left`, `right` | Which part of the wide picture the square box shows |
-| `PAIRING` | `auto` (default), `always`, `off` | When the Pi accepts a new pairing |
-| `PAIRING_WINDOW` | seconds, default `180` | How long after power-up another TFT may pair |
-| `KEYMAP` | e.g. `UP=left,DOWN=right` | Handlebar key to CarPlay command |
+| `ZOOM` | `small`, `normal`, `large` | Size of CarPlay in the small square nav box |
+| `SMALL_NAV_VIEW` | `center`, `left`, `right` | Which part of the map the square box shows |
 | `CARPLAY_NIGHT` | `0`, `1` | CarPlay dark mode |
-| `PHONE_BATTERY`, `PHONE_SIGNAL` | `auto`, `off`, `0`-`100` | What the bike's status bar shows (the dongle doesn't pass the iPhone's real values) |
-| `AUTO_UPDATE` | `on` (default), `any`, `off` | At power-up on the home Wi-Fi (`any`: also a hotspot), download a new release and ask on the TFT: Update now / Not now |
+| `BT_NAME` | any name | The name the bike shows when pairing |
+| `AUTO_UPDATE` | `on`, `any`, `off` | Updates on the home Wi-Fi (`any`: also on a phone hotspot; `off`: never) |
 
-The full list, with explanations, is in `tftpush/auto.py` (`DEFAULTS`).
+## Help and ideas
 
-For bigger text on the wide screen, use the iPhone itself: turn Display Zoom off and pick a
-larger text size for CarPlay in the iPhone's Accessibility settings. (CarPlay sizes itself to
-the screen height, so a different picture size from the Pi doesn't help.)
+Questions, ideas, a good way to power the box from the bike? Share them in the
+[Discussions](https://github.com/macgaver/pi-carplay-motorrad/discussions).
 
-## Recovery
+Developers: how it works, the code, and building the software yourself are in
+[docs/DEVELOPERS.md](docs/DEVELOPERS.md).
 
-The Pi never gives up; every failure ends in a new attempt:
-
-| Problem | What the Pi does |
-| --- | --- |
-| Bike off or out of range | Tries again every 6 s |
-| Bluetooth drops while connecting | New attempt at once |
-| The TFT takes the connection but ignores it (seen after a fuel stop) | After 3 tries, restarts its Bluetooth radio; after 6, all its Bluetooth software |
-| Wi-Fi Direct fails, or drops while riding | Detected within 15 s, new attempt |
-| The TFT shows the app but asks for no picture | Asks again after 2 s, new session after 6 s |
-| Bluetooth service restarted or adapter lost | tftpush restarts and sets everything up again |
-| iPhone not reconnecting to the dongle | Asks the dongle to reconnect every 15 s |
-| Any crash | systemd restarts tftpush within 5 s |
-
-## How it works
-
-1. **Bluetooth.** The Pi looks like a phone: class of device `0x5a020c`, media (A2DP/HFP)
-   connected, and the BMW SPP record advertised (UUID `c707050e-efae-1449-3913-c191e5bb32dc`).
-2. **Ice.** It opens RFCOMM to the TFT's BMW service and speaks ZeroC Ice (protocol 1.0,
-   encoding 1.1): `createMySpinICESession`, Hello, country code, then
-   `getMySpinICEveh(WLAN_CREDENTIALS_P2P)` returns the TFT's Wi-Fi Direct name and PIN.
-3. **Wi-Fi Direct.** It joins the TFT's group with that WPS PIN and reports "connected". A
-   USB Wi-Fi adapter is used if present; otherwise the onboard radio is borrowed (the home
-   Wi-Fi then drops while the bike link is up).
-4. **mySPIN.** The TFT announces its endpoint as JSON on UDP 8158. The Pi connects over TCP,
-   runs the Bosch mySPIN handshake and declares the BMW apps.
-5. **Screens.** Each nav screen asks for frames on its own (`screen_id`, size). The Pi answers
-   each FrameRequest with one JPEG at exactly that size, capped at about 30 KB (what the TFT
-   accepts). When the rider switches screens, the Pi pings the other screens (type 168) and
-   registers the new one again (type 164), which keeps both screens alive in one session.
-6. **CarPlay.** The iPhone connects to the dongle over wireless CarPlay; the dongle sends
-   H.264 video at 1920x464 over USB. The Pi decodes it in software (the Pi 4's hardware
-   decoder holds back 22 frames) and keeps only the newest picture. The square box gets a
-   square cut centred on the map.
-7. **Controls.** Handlebar keys arrive as mySPIN CustomData and go to the dongle as CarPlay
-   knob commands. The Pi sends `MMC_FOCUS` over Ice when its app is in front, so the TFT stops
-   using the keys for volume.
-
-Protocol layouts come from the public reverse-engineering in
-[MOTO-HUB](https://github.com/vincenzobpt/MOTO-HUB) and
-[open-connected-tft](https://github.com/vandelayautollc/open-connected-tft). This code is an
-independent MIT implementation; no code was copied from either project.
-
-## Code map
-
-| Module | Job |
-| --- | --- |
-| `tftpush/auto.py` | Headless mode: settings, pairing agent and lock, session loop, recovery, LED |
-| `tftpush/bt.py` | SDP record, RFCOMM connect with retry, Ice framing and heartbeat |
-| `tftpush/ice.py`, `tftpush/ice_dialog.py` | Ice codec; Bluetooth dialogue up to the Wi-Fi Direct credentials |
-| `tftpush/wifi.py`, `tftpush/p2p.py` | Wi-Fi interface choice, own `wpa_supplicant`, Wi-Fi Direct join |
-| `tftpush/myspin.py`, `tftpush/session.py` | mySPIN packets, TCP session, per-screen frames, stuck-start watchdog |
-| `tftpush/carlinkit/` | Carlinkit USB protocol, dongle driver, desk simulator |
-| `tftpush/video.py` | H.264 decoding, newest picture, small-nav cut, JPEG per screen size |
-| `tftpush/carplay.py` | Ties dongle, video, keys and audio together; status screens |
-| `tftpush/cards.py` | The status screens (drawn in code, no image files) |
-| `tftpush/carplay_input.py`, `tftpush/carplay_audio.py` | Keys to CarPlay; CarPlay audio to the bike |
-| `tftpush/phone_status.py` | Battery and signal for the bike's status bar (hands-free) |
-| `tftpush/fake_tft.py` | Desk simulator of the TFT |
-| `image/` | Builds the ready-to-flash SD-card image |
-| `tools/deploy.sh` | Copies the code to a Pi and restarts the service |
-
-## Desk test (any Linux box, no bike)
-
-```sh
-python3 -m venv .venv && . .venv/bin/activate
-pip install -e '.[test,carplay]'
-pytest -q
-tftpush carplay-desk --out frames   # fake dongle + fake TFT: the whole CarPlay path
-```
-
-The square nav box shows the same status screen, stacked:
-
-![Pi CarPlay screen on the square nav box](docs/screen-square.jpg)
+MIT license, see [LICENSE](LICENSE).
