@@ -26,10 +26,14 @@ seul à chaque sortie.
 | | Quoi | Remarques | Exemple |
 | --- | --- | --- | --- |
 | 1 | **Raspberry Pi 4 Model B** | 1 Go de mémoire suffit largement | [PiShop.ca](https://www.pishop.ca/product/raspberry-pi-4-model-b-1gb/) |
-| 2 | **Adaptateur USB CarPlay sans fil Carlinkit** | Testé : Carlinkit A15W (apparaît sous le nom « AutoKit-… ») | [Amazon](https://a.co/d/0bSMkhVc) |
+| 2 | **Adaptateur USB CarPlay sans fil Carlinkit, modèle CPC200-CCPA** | **N'achetez qu'un adaptateur dont l'annonce ou la boîte indique clairement CPC200-CCPA** : les autres, même s'ils se ressemblent, ne fonctionnent pas. Testé : Carlinkit A15W (apparaît sous le nom « AutoKit-… ») | [Amazon](https://a.co/d/0bSMkhVc) |
 | 3 | **Carte microSD de 32 Go ou plus** | Une carte rapide (marquée A1 ou A2) : le boîtier démarre plus vite | [Amazon.ca](https://www.amazon.ca/Micro-SD-Cards/b?ie=UTF8&node=3381334011) |
 | 4 | **Batterie USB de 10 000 mAh** + un **câble USB-C** | Choisissez-en une qui fournit 3 A (15 W) ou plus. Testé : plus de 5 heures de route | Toute bonne marque |
 | 5 | Un **boîtier** pour le Pi 4 | Facultatif, mais il protège le Pi | N'importe quel boîtier Pi 4 |
+
+> **À propos de l'adaptateur CarPlay (article 2) :** on trouve beaucoup d'adaptateurs qui se
+> ressemblent. Le boîtier ne fonctionne qu'avec le **Carlinkit CPC200-CCPA**. Si la page du
+> produit ou la boîte n'indique pas clairement **CPC200-CCPA**, choisissez-en un autre.
 
 Il vous faut aussi :
 - une **moto BMW Motorrad avec l'écran Connectivity 10,25" et la navigation**,

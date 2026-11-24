@@ -25,10 +25,14 @@ you ride.
 | | What | Notes | Example |
 | --- | --- | --- | --- |
 | 1 | **Raspberry Pi 4 Model B** | 1 GB of memory is plenty | [PiShop.ca](https://www.pishop.ca/product/raspberry-pi-4-model-b-1gb/) |
-| 2 | **Carlinkit wireless CarPlay USB adapter** | Tested: Carlinkit A15W (shows up as "AutoKit-…") | [Amazon](https://a.co/d/0bSMkhVc) |
+| 2 | **Carlinkit wireless CarPlay USB adapter, model CPC200-CCPA** | **Only buy one whose listing or box clearly says CPC200-CCPA**: other adapters, even similar-looking ones, won't work. Tested: Carlinkit A15W (shows up as "AutoKit-…") | [Amazon](https://a.co/d/0bSMkhVc) |
 | 3 | **microSD card, 32 GB or more** | A fast one (marked A1 or A2): the box starts faster | [Amazon.ca](https://www.amazon.ca/Micro-SD-Cards/b?ie=UTF8&node=3381334011) |
 | 4 | **USB battery pack, 10,000 mAh** + a **USB-C cable** | Pick one that gives 3 A (15 W) or more. Tested: over 5 hours of riding | Any good brand |
 | 5 | A **case** for the Pi 4 | Optional, but it protects the box | Any Pi 4 case |
+
+> **About the CarPlay adapter (part 2):** many look-alike adapters are sold. The box only
+> works with the **Carlinkit CPC200-CCPA**. If the product page or the box doesn't clearly
+> say **CPC200-CCPA**, pick another one.
 
 You also need:
 - a **BMW Motorrad bike with the 10.25" Connectivity screen and navigation**,
