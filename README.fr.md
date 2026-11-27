@@ -110,12 +110,22 @@ loge dans le petit coffre sous le siège passager, avec ce
    appareil**.
 3. Choisissez **Pi CarPlay**, et confirmez le code sur la moto. Le boîtier confirme de son
    côté tout seul.
+4. **Vérifiez que ça a marché :** ouvrez la **navigation** de la moto et patientez. En
+   **2 minutes** environ, le symbole Wi-Fi de la moto cesse de clignoter et l'écran affiche
+   la page **Connect your iPhone** du boîtier :
+
+   ![Écran « Connect your iPhone »](docs/screen-wide.jpg)
+
+   Le voyant vert du Pi est alors **allumé, avec un bref clignotement toutes les 2 secondes**.
+
+**Ne passez pas à l'iPhone avant de voir cette page.** Elle montre que le boîtier et la moto
+sont entièrement connectés (Bluetooth, puis Wi-Fi). Si le symbole Wi-Fi clignote encore ou si
+la navigation reste grisée au bout de 5 minutes, voyez
+[En cas de problème](#en-cas-de-problème) avant d'aller plus loin.
 
 ## Étape 8 : connectez votre iPhone (une fois)
 
-Ouvrez la **navigation** de la moto. L'écran indique quoi faire :
-
-![Écran « Connect your iPhone »](docs/screen-wide.jpg)
+Avec la page **Connect your iPhone** sur l'écran de la moto :
 
 1. Sur l'iPhone : **Réglages > Bluetooth**, et touchez l'adaptateur (**AutoKit-…**, le nom
    qu'affiche l'écran de la moto).
@@ -164,6 +174,7 @@ Le numéro de version est affiché dans le coin des écrans du boîtier.
 | Ce que vous voyez | Que faire |
 | --- | --- |
 | **« CarPlay dongle not found »** sur l'écran de la moto | L'adaptateur CarPlay n'est pas branché, ou démarre encore. Vérifiez qu'il est sur un port USB du Pi et attendez une minute. |
+| Après le jumelage, le **symbole Wi-Fi de la moto clignote sans arrêt** et la navigation reste grisée | La moto est jumelée en Bluetooth, mais le boîtier n'arrive pas à rejoindre le Wi-Fi de la moto. Vérifiez : c'est un **Raspberry Pi 4 Model B** ; la moto a l'**écran 10,25"** ; `WIFI_COUNTRY` (étape 4) est votre pays ; la batterie fournit 3 A. Loin de votre Wi-Fi maison, éteignez tout, alimentez le boîtier, attendez une minute, puis mettez le contact et attendez 5 minutes. Ça clignote encore ? Demandez dans les [Discussions](https://github.com/macgaver/pi-carplay-motorrad/discussions), en précisant ce que fait le voyant vert. |
 | La moto ne trouve pas **Pi CarPlay** | Le boîtier a besoin d'environ une minute après la mise sous tension. Vérifiez que son voyant vert clignote lentement. |
 | Jumeler une **autre moto** | Éteignez et rallumez le boîtier, et jumelez la nouvelle moto dans les 3 minutes. En dehors de ce délai, seule votre moto peut se jumeler. |
 | L'iPhone ne se connecte pas | Activez le Wi-Fi et le Bluetooth de l'iPhone. Sinon, oubliez l'AutoKit dans les réglages Bluetooth de l'iPhone et refaites l'étape 8. |

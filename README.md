@@ -106,12 +106,22 @@ compartment under the passenger seat, with this
 2. On the bike's screen: **Settings > Connections > Mobile device > pair a new device**.
 3. Choose **Pi CarPlay**, and confirm the code on the bike. The box confirms its side by
    itself.
+4. **Check that it worked:** open the **navigation** on the bike and wait. Within about
+   **2 minutes**, the bike's Wi-Fi symbol stops flashing and the screen shows the box's
+   **Connect your iPhone** page:
+
+   ![Connect your iPhone screen](docs/screen-wide.jpg)
+
+   The Pi's green light is then **on, with a short blink every 2 seconds**.
+
+**Don't go on to the iPhone until you see this page.** It shows the box and the bike are
+fully connected (Bluetooth, then Wi-Fi). If the Wi-Fi symbol keeps flashing or the
+navigation stays greyed out after 5 minutes, see
+[If something doesn't work](#if-something-doesnt-work) before going further.
 
 ## Step 8: Connect your iPhone (once)
 
-Open the **navigation** on the bike. The screen shows what to do:
-
-![Connect your iPhone screen](docs/screen-wide.jpg)
+With the **Connect your iPhone** page on the bike's screen:
 
 1. On the iPhone: **Settings > Bluetooth**, and tap the adapter (**AutoKit-…**, the name
    the bike's screen shows).
@@ -159,6 +169,7 @@ The version number is shown in the corner of the box's screens.
 | What you see | What to do |
 | --- | --- |
 | **"CarPlay dongle not found"** on the bike's screen | The CarPlay adapter isn't plugged in, or is still starting. Check it's in a USB port on the Pi and wait a minute. |
+| After pairing, the bike's **Wi-Fi symbol keeps flashing** and the navigation stays greyed out | The bike paired over Bluetooth, but the box can't join the bike's Wi-Fi. Check: it's a **Raspberry Pi 4 Model B**; the bike has the **10.25" screen**; `WIFI_COUNTRY` (step 4) is your country; the battery gives 3 A. Away from your home Wi-Fi, switch everything off, power the box, wait a minute, then turn the ignition on and wait 5 minutes. Still flashing? Ask in the [Discussions](https://github.com/macgaver/pi-carplay-motorrad/discussions), saying what the green light does. |
 | The bike doesn't list **Pi CarPlay** | The box needs about a minute after power-up. Check its green light blinks slowly. |
 | Pairing a **different bike** | Switch the box off and on, and pair the new bike within 3 minutes. Only your bike can pair outside of that. |
 | The iPhone doesn't connect | Turn the iPhone's Wi-Fi and Bluetooth on. If it still won't, forget the AutoKit in the iPhone's Bluetooth settings and do step 8 again. |
