@@ -326,9 +326,10 @@ class Session:
             log.debug("event %s %s", ev.kind, ev.data)
 
     def _maybe_send_appinfo2(self) -> None:
-        """Experiment: declare the two BMW nav apps so the TFT opens screens (TFTPUSH_APPINFO2)."""
+        """Declare the two BMW nav apps so the TFT opens its screens and asks for frames.
+        On by default; TFTPUSH_APPINFO2=0 turns it off."""
         import os
-        if os.environ.get("TFTPUSH_APPINFO2") != "1":
+        if os.environ.get("TFTPUSH_APPINFO2", "1") != "1":
             return
         which = os.environ.get("TFTPUSH_APPS", "both")
         mona = {"bundle": "com.bmw.connride.mona", "name": "BMW Motorrad Navigation"}

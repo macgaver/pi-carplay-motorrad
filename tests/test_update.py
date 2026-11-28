@@ -241,6 +241,7 @@ def test_daemon_asks_on_the_tft_when_a_download_is_ready(tmp_path, monkeypatch):
     monkeypatch.setattr(update, "start_install", lambda: started.append(1) or True)
     d = auto.Daemon(tmp_path / "bmw-carplay.txt", tmp_path)
     d.carplay = _carplay()
+    d._bike_showed_picture()                                      # the bike can show the question
 
     async def go():
         await d._check_update()
@@ -290,9 +291,42 @@ def test_daemon_goes_back_to_carplay_if_the_install_cannot_start(tmp_path, monke
     monkeypatch.setattr(update, "start_install", lambda: False)
     d = auto.Daemon(tmp_path / "bmw-carplay.txt", tmp_path)
     d.carplay = _carplay()
+    d._bike_showed_picture()                                      # the bike can show the question
 
     async def go():
         await d._check_update()
         d.carplay.on_key(key(Key.RIGHT))
     asyncio.run(go())
     assert not d.carplay.prompting
+
+
+def test_daemon_installs_without_asking_if_the_bike_never_showed_a_picture(tmp_path, monkeypatch):
+    """Regression (2026-11-28): with Navigation greyed out the question can never be seen, so
+    a fix could only reach the box by flashing the card again."""
+    from tftpush import auto
+
+    async def ready(cfg):
+        return "1.0.1"
+
+    monkeypatch.setattr(update, "check_at_power_up", ready)
+    started = []
+    monkeypatch.setattr(update, "start_install", lambda: started.append(1) or True)
+    d = auto.Daemon(tmp_path / "bmw-carplay.txt", tmp_path)
+    d.carplay = _carplay()
+    asyncio.run(d._check_update())
+    assert started == [1] and not d.carplay.prompting
+
+
+def test_first_picture_to_the_bike_is_remembered(tmp_path):
+    from tftpush import auto
+
+    d = auto.Daemon(tmp_path / "bmw-carplay.txt", tmp_path)
+    cp = _carplay()
+    cp.on_first_picture = d._bike_showed_picture
+    assert not d.shown_file.exists()
+    src = cp.source(type("S", (), {"width": 640, "height": 640})())
+    src.jpeg()
+    assert d.shown_file.exists()
+    d.shown_file.unlink()
+    src.jpeg()                                   # only the first picture calls back
+    assert not d.shown_file.exists()

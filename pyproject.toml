@@ -24,6 +24,7 @@ version = { file = "VERSION" }
 packages = ["tftpush", "tftpush.carlinkit"]
 
 [tool.setuptools.package-data]
+"tftpush" = ["hmi.json"]
 "tftpush.carlinkit" = ["testclip.h264"]
 
 [tool.pytest.ini_options]

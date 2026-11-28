@@ -443,6 +443,9 @@ class Daemon:
         self.cfg = load_config(config_path)
         self.led = Led(self.cfg["LED"])
         self.addr_file = state_dir / "tft-address"
+        # Written the first time the bike takes one of our pictures; until then an update
+        # installs without asking (the question could never be seen).
+        self.shown_file = state_dir / "bike-showed-picture"
         self.in_session = False
         self.tft: str | None = None
         self._session: asyncio.Task | None = None
@@ -575,6 +578,7 @@ class Daemon:
 
         self.carplay = CarPlay(CarPlaySettings.from_config(self.cfg, self.state_dir / "captures"),
                                open_transport=open_transport, phone_status=self.phone_status)
+        self.carplay.on_first_picture = self._bike_showed_picture
         self._carplay_task = asyncio.create_task(self.carplay.run())
 
     def _make_phone_status(self):
@@ -626,10 +630,24 @@ class Daemon:
             log.info("update %s is ready, but CARPLAY is off so the TFT can't ask; "
                      "install it with: sudo tftpush-update --install", version)
             return
+        if not self.shown_file.exists():
+            # The bike has never shown this box's screens (for example Navigation stays
+            # greyed out), so it can't show the question either. Seen 2026-11-28: a release
+            # without the Navigation fix could only be repaired by flashing the card again.
+            log.info("update %s is ready and the bike has never shown this box's screens, "
+                     "so it can't ask; installing it now", version)
+            update.start_install()
+            return
         prompt = update.UpdatePrompt(version, self._update_answer, notify=self.carplay.video._notify)
         self.update_prompt = prompt
         self.carplay.ask(prompt)
         asyncio.create_task(self._prompt_timeout(prompt))
+
+    def _bike_showed_picture(self) -> None:
+        if not self.shown_file.exists():
+            self.shown_file.parent.mkdir(parents=True, exist_ok=True)
+            self.shown_file.touch()
+            log.info("the bike shows this box's screens; updates will ask first")
 
     def _update_answer(self, now: bool) -> None:
         from . import update

@@ -81,6 +81,7 @@ independent MIT implementation; no code was copied from either project.
 | `tftpush/auto.py` | Headless mode: settings, pairing agent and lock, session loop, recovery, LED |
 | `tftpush/bt.py` | SDP record, RFCOMM connect with retry, Ice framing and heartbeat |
 | `tftpush/ice.py`, `tftpush/ice_dialog.py` | Ice codec; Bluetooth dialogue up to the Wi-Fi Direct credentials |
+| `tftpush/remotehmi.py`, `tftpush/hmi.json` | Replays the captured `RemoteHMI_App` replies that make the bike un-grey its Navigation menu (on by default; `TFTPUSH_HMI_CAPTURE=` turns it off) |
 | `tftpush/wifi.py`, `tftpush/p2p.py` | Wi-Fi interface choice, own `wpa_supplicant`, Wi-Fi Direct join |
 | `tftpush/myspin.py`, `tftpush/session.py` | mySPIN packets, TCP session, per-screen frames, stuck-start watchdog |
 | `tftpush/carlinkit/` | Carlinkit USB protocol, dongle driver, desk simulator |

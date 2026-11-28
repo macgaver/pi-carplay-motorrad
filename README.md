@@ -162,6 +162,9 @@ starts at home. When there is one, the bike's screen asks:
   version.
 - **Not now**: CarPlay right away. It asks again next time the box starts at home.
 
+If the bike has never shown the box's screens (for example Navigation stays greyed out),
+the question can't appear, so the box installs the new version without asking.
+
 The version number is shown in the corner of the box's screens.
 
 ## If something doesn't work

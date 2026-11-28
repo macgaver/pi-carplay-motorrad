@@ -10,10 +10,15 @@ import logging
 import os
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable
 
 from . import ice, remotehmi
 from .ice import Identity, MessageId, MySpinIceMsg
+
+# The captured RemoteHMI_App replies that make the TFT un-grey its Navigation menu. Shipped
+# with the package; TFTPUSH_HMI_CAPTURE points elsewhere, or set to empty turns it off.
+DEFAULT_HMI_CAPTURE = Path(__file__).with_name("hmi.json")
 
 log = logging.getLogger("tftpush.ice_dialog")
 
@@ -78,7 +83,7 @@ class IceDialog:
         self._hmi: remotehmi.RemoteHmi | None = None
         self._hmi_opened = False
         self._hmi_identity: Identity | None = None
-        cap = os.environ.get("TFTPUSH_HMI_CAPTURE")
+        cap = os.environ.get("TFTPUSH_HMI_CAPTURE", str(DEFAULT_HMI_CAPTURE))
         if cap:
             try:
                 self._hmi = remotehmi.RemoteHmi.load(cap)

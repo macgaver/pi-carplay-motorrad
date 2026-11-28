@@ -147,6 +147,10 @@ class CarPlay:
         self.audio = AudioOut(settings.audio_cmd) if settings.audio else None
         self.state = "absent"
         self.state_version = 0
+        # Called once, the first time a BMW screen takes one of our pictures (the bike can
+        # show this box's screens, so it can also show the update question).
+        self.on_first_picture: Callable[[], None] | None = None
+        self._picture_sent = False
         self.info: dict[str, str] = {}  # what the dongle reports: bluetooth name / pin, wifi name
         self._cards: dict[tuple, bytes] = {}
         self.prompt = None  # update.UpdatePrompt: takes over the picture and the keys while active
@@ -250,6 +254,16 @@ class CarPlay:
         picture appears at once."""
         self.dongle.request_keyframe()
 
+    def picture_sent(self) -> None:
+        if self._picture_sent:
+            return
+        self._picture_sent = True
+        if self.on_first_picture:
+            try:
+                self.on_first_picture()
+            except Exception as exc:  # noqa: BLE001 - bookkeeping must never stop the picture
+                log.warning("first-picture callback failed: %s", exc)
+
     @property
     def live(self) -> bool:
         return self.state == "connected" and self.video.has_picture
@@ -316,6 +330,7 @@ class CarPlaySource:
 
     def jpeg(self, w: int | None = None, h: int | None = None) -> bytes:
         w, h = w or self.width, h or self.height
+        self.cp.picture_sent()
         if self.cp.live and not self.cp.prompting:
             data = self.cp.video.jpeg(w, h)
             if data:

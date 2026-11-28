@@ -1088,3 +1088,43 @@ def test_daemon_exits_for_a_restart_once_bluetoothd_lost_our_setup(tmp_path):
     asyncio.run(d._check_bluetooth(bz))
     with pytest.raises(SystemExit):
         asyncio.run(d._check_bluetooth(bz))
+
+
+def test_hmi_capture_is_packaged_and_on_by_default(monkeypatch):
+    """Regression (2026-11-28): the release image left Navigation greyed out because the
+    RemoteHMI capture and its setting existed only on the developer's Pi."""
+    from tftpush import ice_dialog, remotehmi
+
+    assert ice_dialog.DEFAULT_HMI_CAPTURE.is_file()
+    hmi = remotehmi.RemoteHmi.load(str(ice_dialog.DEFAULT_HMI_CAPTURE))
+    assert hmi.identity == "96836d61-45b7-4ff2-a1c3-69b297294eba"
+    assert any(op == "getHMIDescription" for op, _ in hmi._replies)
+    monkeypatch.delenv("TFTPUSH_HMI_CAPTURE")
+    d = ice_dialog.IceDialog(send=lambda _f: None)
+    assert d._hmi is not None
+
+
+def test_hmi_capture_can_be_turned_off(monkeypatch):
+    from tftpush import ice_dialog
+
+    monkeypatch.setenv("TFTPUSH_HMI_CAPTURE", "")
+    assert ice_dialog.IceDialog(send=lambda _f: None)._hmi is None
+
+
+def test_nav_apps_declared_by_default(monkeypatch):
+    from tftpush import session
+
+    sent = []
+
+    class P:
+        def send_app_info_apps(self, apps):
+            sent.append([a["bundle"] for a in apps])
+
+    s = session.Session.__new__(session.Session)
+    s.protocol = P()
+    monkeypatch.delenv("TFTPUSH_APPINFO2", raising=False)
+    s._maybe_send_appinfo2()
+    assert sent == [["com.bmw.connride.mona", "com.bmw.connride.apps"]]
+    monkeypatch.setenv("TFTPUSH_APPINFO2", "0")
+    s._maybe_send_appinfo2()
+    assert len(sent) == 1

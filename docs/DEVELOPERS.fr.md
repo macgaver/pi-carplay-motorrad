@@ -86,6 +86,7 @@ implémentation indépendante sous licence MIT ; aucun code n'a été copié de 
 | `tftpush/auto.py` | Mode autonome : réglages, agent et verrou de jumelage, boucle de session, reprise, voyant |
 | `tftpush/bt.py` | Enregistrement SDP, connexion RFCOMM avec reprise, trames Ice et battement de cœur |
 | `tftpush/ice.py`, `tftpush/ice_dialog.py` | Codec Ice ; dialogue Bluetooth jusqu'aux identifiants Wi-Fi Direct |
+| `tftpush/remotehmi.py`, `tftpush/hmi.json` | Rejoue les réponses `RemoteHMI_App` enregistrées qui font dégriser le menu Navigation de la moto (actif par défaut ; `TFTPUSH_HMI_CAPTURE=` le désactive) |
 | `tftpush/wifi.py`, `tftpush/p2p.py` | Choix de l'interface Wi-Fi, `wpa_supplicant` dédié, connexion Wi-Fi Direct |
 | `tftpush/myspin.py`, `tftpush/session.py` | Paquets mySPIN, session TCP, images par écran, surveillance des démarrages bloqués |
 | `tftpush/carlinkit/` | Protocole USB Carlinkit, pilote de l'adaptateur, simulateur |

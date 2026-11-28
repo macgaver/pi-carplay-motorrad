@@ -167,6 +167,10 @@ chaque fois qu'il démarre à la maison. S'il y en a une, l'écran de la moto de
 - **Not now** (plus tard) : CarPlay tout de suite. La question revient au prochain démarrage
   à la maison.
 
+Si la moto n'a encore jamais affiché les écrans du boîtier (par exemple si la Navigation
+reste grisée), la question ne peut pas s'afficher : le boîtier installe alors la nouvelle
+version sans demander.
+
 Le numéro de version est affiché dans le coin des écrans du boîtier.
 
 ## En cas de problème
