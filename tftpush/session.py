@@ -68,6 +68,10 @@ async def await_announcement(timeout: float = 60.0, port: int = ANNOUNCE_PORT, i
         sock.close()
 
 
+class StuckStart(ConnectionError):
+    """The TFT showed our app but never asked for a picture."""
+
+
 class Session:
     """One mySPIN TCP session: serves frames from a FrameSource (a still image, live
     CarPlay, ...) to every TFT screen that asks, and passes handlebar keys on."""
@@ -240,8 +244,7 @@ class Session:
             self.protocol.send_server_app_started(myspin.APP_STATUS_SUCCESS)
         if waited >= self._stuck_give_up:
             self._shown_at = None
-            raise ConnectionError(f"TFT shows our app but never asked for a picture in {waited:.0f} s; "
-                                  "starting a new session")
+            raise StuckStart(f"TFT shows our app but never asked for a picture in {waited:.0f} s")
 
     def _on_event(self, ev: myspin.Event) -> None:
         loop = asyncio.get_running_loop()
@@ -267,11 +270,11 @@ class Session:
             log.info("FrameRequest screen_id=%d %dx%d", req.screen_id, req.width, req.height)
             self._request_at[req.screen_id] = loop.time()
             self._shown_at = None
-            if req.screen_id not in self._known_screens and os.environ.get("TFTPUSH_SCREEN_ANNOUNCE") == "1":
-                # Experiment: the real app sends a one-time type-164 "this screen exists"
-                # announcement the first time it sees a new screen_id (libclusterlink.so
-                # 0x161144) -- we never send this today. Try replicating it for protocol
-                # completeness; gated so it's easy to compare behaviour with/without it.
+            if req.screen_id not in self._known_screens and os.environ.get("TFTPUSH_SCREEN_ANNOUNCE", "1") == "1":
+                # The real app sends a one-time type-164 "this screen exists" announcement the
+                # first time it sees a new screen_id (libclusterlink.so 0x161144). Without it,
+                # seen 2026-11-28: small nav first, then the big nav stayed on the cast
+                # animation. On by default; TFTPUSH_SCREEN_ANNOUNCE=0 turns it off.
                 self.protocol.send_screen_registered(req.screen_id, req.width, req.height)
                 log.info("sent screen-registered (type 164) for screen %d (%dx%d)",
                          req.screen_id, req.width, req.height)

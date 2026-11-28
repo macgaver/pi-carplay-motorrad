@@ -782,7 +782,7 @@ def test_a_tft_that_shows_our_app_but_never_asks_for_a_picture_is_retried_then_d
         sent = []
         s.protocol.send_server_app_started = lambda status: sent.append(status)
         s._on_event(Event("client_state", (3, 1, 2)))
-        with pytest.raises(ConnectionError, match="never asked for a picture"):
+        with pytest.raises(session.StuckStart, match="never asked for a picture"):
             for _ in range(20):
                 await asyncio.sleep(0.02)
                 s._check_stuck(asyncio.get_running_loop().time())
@@ -798,6 +798,7 @@ def test_a_frame_request_disarms_the_stuck_watchdog():
     async def go():
         s = session.Session(lambda scr: None, stuck_retry=0.05, stuck_give_up=0.1)
         s.protocol.send_server_app_started = lambda status: None
+        s.protocol.send_screen_registered = lambda *a: None
         s._on_event(Event("client_state", (3, 1, 2)))
         s._on_event(Event("frame_request", FrameRequest(2, 0, 0, 1920, 464, 0)))
         await asyncio.sleep(0.2)
@@ -1016,7 +1017,7 @@ def test_a_start_app_with_no_picture_request_after_it_is_retried_then_dropped():
         sent = []
         s.protocol.send_server_app_started = lambda status: sent.append(status)
         s._on_event(Event("start_app", (38, 3)))
-        with pytest.raises(ConnectionError, match="never asked for a picture"):
+        with pytest.raises(session.StuckStart, match="never asked for a picture"):
             for _ in range(20):
                 await asyncio.sleep(0.02)
                 s._check_stuck(asyncio.get_running_loop().time())
@@ -1128,3 +1129,22 @@ def test_nav_apps_declared_by_default(monkeypatch):
     monkeypatch.setenv("TFTPUSH_APPINFO2", "0")
     s._maybe_send_appinfo2()
     assert len(sent) == 1
+
+
+def test_a_new_screen_is_announced_by_default(monkeypatch):
+    """Bike, 2026-11-28: without the type-164 announcement, small nav first then the big nav
+    stayed on the cast animation (the setting existed only on the developer's Pi)."""
+    from tftpush import session
+    from tftpush.myspin import Event, FrameRequest
+
+    monkeypatch.delenv("TFTPUSH_SCREEN_ANNOUNCE", raising=False)
+    announced = []
+
+    async def go():
+        s = session.Session(lambda scr: None)
+        s.protocol.send_screen_registered = lambda sid, w, h: announced.append((sid, w, h))
+        s._on_event(Event("frame_request", FrameRequest(3, 0, 0, 640, 640, 0)))
+        s._on_event(Event("frame_request", FrameRequest(3, 0, 0, 640, 640, 1)))
+
+    asyncio.run(go())
+    assert announced == [(3, 640, 640)]       # once per new screen

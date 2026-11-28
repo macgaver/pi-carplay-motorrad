@@ -104,6 +104,9 @@ async def _probe(dialog, link, s, plan: str) -> None:
     log.info("probe: plan finished; frames sent so far: %s", s.frames_sent if s is not None else "-")
 
 
+SAME_WIFI_RETRIES = 2
+
+
 async def run_once(
     tft: str,
     *,
@@ -305,7 +308,21 @@ async def run_once(
             on_streaming()
         if os.environ.get("TFTPUSH_PROBE"):
             tasks.append(asyncio.create_task(_probe(dialog, link, s, os.environ["TFTPUSH_PROBE"])))
-        await s.run(ep.host, ep.port)
+        # A stuck start (the TFT shows our app but never asks for a picture) is retried on a
+        # new mySPIN connection over the same Wi-Fi Direct link first: a few seconds instead
+        # of the ~30 s of a whole new Bluetooth + Wi-Fi session.
+        for attempt in range(1, SAME_WIFI_RETRIES + 1):
+            try:
+                await s.run(ep.host, ep.port)
+                break
+            except session.StuckStart as exc:
+                log.warning("%s; reopening the picture connection on the same Wi-Fi (try %d of %d)",
+                            exc, attempt, SAME_WIFI_RETRIES)
+                await asyncio.sleep(0.5)
+                s = session.Session(source_factory or make, on_key=on_key, capture=cap.myspin,
+                                    on_state=app_in_front)
+        else:
+            await s.run(ep.host, ep.port)   # a last stuck start ends the session as before
     finally:
         for t in tasks:
             if t:
